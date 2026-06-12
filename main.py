@@ -4,24 +4,23 @@ import random
 import sys
 import pandas as pd
 
-# ===================== KONFIGURASI =====================
+# Konfigurasi dasar
 FILEPATH = "student_lifestyle_dataset.csv"
 TARGET_COL = "Stress_Level"
 RANDOM_SEED = 42
 
 
-# ======================== 1. LOAD & PREPROCESS DATA ========================
+# 1. Load & Preprocess Data
 def load_and_preprocess(filepath):
     """
-    Membaca dataset, menangani missing values (imputasi),
-    dan mengembalikan pandas DataFrame yang bersih.
+    Fungsi buat baca dataset dan beresin missing values (imputasi).
     """
     print(f"\n[STEP 1] Memuat dataset dari '{filepath}'...")
     
-    # Jika file tidak ada secara lokal, unduh via kagglehub dan salin
+    # Kalau file csv lokal ga ada, download dulu dari kagglehub
     if not os.path.exists(filepath):
-        print(f"  [INFO] File '{filepath}' tidak ditemukan secara lokal.")
-        print("  [INFO] Mengunduh dataset dari Kaggle menggunakan kagglehub...")
+        print(f"  [INFO] File '{filepath}' ga ada di lokal.")
+        print("  [INFO] Coba download dataset dari Kaggle pakai kagglehub...")
         try:
             import kagglehub
             import shutil
@@ -32,45 +31,45 @@ def load_and_preprocess(filepath):
             shutil.copy(src_file, filepath)
             print(f"  [INFO] Dataset berhasil diunduh dan disalin ke '{filepath}'.")
         except Exception as e:
-            print(f"  [ERROR] Gagal mengunduh dataset: {e}")
-            print("  Pastikan koneksi internet aktif atau file sudah diletakkan di folder kerja.")
+            print(f"  [ERROR] Gagal download dataset: {e}")
+            print("  Pastiin koneksi internet jalan atau taruh file csv manual di folder kerja.")
             sys.exit(1)
 
     df = pd.read_csv(filepath)
-    print(f"  -> Total data termuat: {len(df)} baris, {len(df.columns)} kolom.")
+    print(f"  -> Total data ke-load: {len(df)} baris, {len(df.columns)} kolom.")
 
-    print("\n[STEP 2] Preprocessing data (Imputasi Missing Values)...")
+    print("\n[STEP 2] Preprocessing data (isi missing values)...")
     
-    # 1. Imputasi fitur kategorikal (Student_Type) dengan Modus
+    # Isi kolom kategorik (Student_Type) pake Modus (nilai tersering)
     if "Student_Type" in df.columns:
         missing_cat = df["Student_Type"].isnull().sum()
         if missing_cat > 0:
             mode_val = df["Student_Type"].mode()[0]
             df["Student_Type"] = df["Student_Type"].fillna(mode_val)
-            print(f"  -> {missing_cat} missing values pada 'Student_Type' diisi dengan Modus: '{mode_val}'")
+            print(f"  -> Ada {missing_cat} data kosong di 'Student_Type' diisi modus: '{mode_val}'")
         else:
-            print("  -> Tidak ada missing values pada 'Student_Type'.")
+            print("  -> Kolom 'Student_Type' aman, ga ada yang kosong.")
 
-    # 2. Imputasi fitur numerik dengan Rata-rata (Mean)
+    # Isi kolom numerik yang kosong pake rata-rata (Mean)
     num_cols = df.select_dtypes(include=["number"]).columns.tolist()
     if TARGET_COL in num_cols:
-        num_cols.remove(TARGET_COL)  # Target tidak perlu diimputasi (karena tidak ada yang null)
+        num_cols.remove(TARGET_COL)  # Skip target biar ga ke-impute
     
     for col in num_cols:
         missing_num = df[col].isnull().sum()
         if missing_num > 0:
             mean_val = df[col].mean()
             df[col] = df[col].fillna(mean_val)
-            print(f"  -> {missing_num} missing values pada '{col}' diisi dengan Rata-rata: {mean_val:.4f}")
+            print(f"  -> Ada {missing_num} data kosong di '{col}' diisi rata-rata: {mean_val:.4f}")
             
-    print("  -> Preprocessing selesai. Data bersih siap digunakan.")
+    print("  -> Preprocessing beres. Data siap dipakai.")
     return df
 
 
-# ======================== 2. EXPLORATORY DATA ANALYSIS (EDA) ========================
+# 2. Exploratory Data Analysis (EDA)
 def run_eda(df):
     """
-    Menampilkan analisis data eksploratif sederhana untuk memahami karakteristik dataset.
+    Analisis data simpel buat ngeliat gambaran dataset.
     """
     print("\n" + "=" * 60)
     print(" EXPLORATORY DATA ANALYSIS (EDA)")
@@ -89,25 +88,24 @@ def run_eda(df):
     for t, count in type_counts.items():
         print(f"   - {t:<15}: {count:>5} mahasiswa")
         
-    print("\n3. Rata-rata Nilai Fitur Numerik Berdasarkan Tingkat Stres:")
+    print("\n3. Rata-rata Nilai Fitur Numerik per Kelas Stres:")
     num_cols = df.select_dtypes(include=["number"]).columns.tolist()
     if TARGET_COL in num_cols:
         grouped = df.groupby(TARGET_COL)[num_cols].mean()
-        # Rename index untuk keterbacaan
-        grouped.index = [f"Stres Rendah (0)", f"Stres Tinggi (1)"]
+        grouped.index = ["Stres Rendah (0)", "Stres Tinggi (1)"]
         print(grouped.to_string(float_format=lambda x: f"{x:.2f}"))
         
     print("=" * 60 + "\n")
 
 
-# ======================== 3. SPLIT DATA ========================
+# 3. Split Data
 def train_val_test_split(df, train_ratio=0.70, val_ratio=0.15, test_ratio=0.15, seed=RANDOM_SEED):
     """
-    Membagi dataset secara acak menjadi data Training, Validation, dan Testing.
+    Bagi dataset acak jadi training, validation, dan testing set.
     """
     print(f"\n[STEP 3] Membagi data (Train: {train_ratio*100:.0f}%, Val: {val_ratio*100:.0f}%, Test: {test_ratio*100:.0f}%)...")
     
-    # Shuffle data
+    # Shuffle data biar acak merata
     shuffled_df = df.sample(frac=1, random_state=seed).reset_index(drop=True)
     
     n = len(shuffled_df)
@@ -118,117 +116,116 @@ def train_val_test_split(df, train_ratio=0.70, val_ratio=0.15, test_ratio=0.15, 
     val_df = shuffled_df.iloc[train_end:val_end]
     test_df = shuffled_df.iloc[val_end:]
     
-    print(f"  -> Ukuran Data Training   : {len(train_df)} baris")
-    print(f"  -> Ukuran Data Validation : {len(val_df)} baris")
-    print(f"  -> Ukuran Data Testing    : {len(test_df)} baris")
+    print(f"  -> Data Training   : {len(train_df)} baris")
+    print(f"  -> Data Validation : {len(val_df)} baris")
+    print(f"  -> Data Testing    : {len(test_df)} baris")
     
     return train_df, val_df, test_df
 
 
-# ======================== 4. MIXED NAIVE BAYES CLASS CLASS ========================
+# 4. Mixed Naive Bayes Classifier
 class MixedNaiveBayes:
     """
-    Klasifikasi Naive Bayes Campuran (from scratch) yang menangani:
-      - Fitur kategorikal menggunakan distribusi frekuensi dengan Laplace Smoothing.
-      - Fitur numerik/kontinu menggunakan fungsi densitas probabilitas Gaussian (Normal).
+    Model Naive Bayes bisa nanganin data campuran:
+    - Kategorikal pakai frekuensi tabel dengan Laplace Smoothing.
+    - Numerik kontinu pakai rumus fungsi peluang Gauss (normal).
     """
     def __init__(self, cat_cols=None, num_cols=None):
         self.cat_cols = cat_cols if cat_cols is not None else []
         self.num_cols = num_cols if num_cols is not None else []
         self.classes = []
         self.priors = {}
-        # Likelihood kategorik: self.cat_likelihoods[kelas][kolom][nilai] = prob
+        # Likelihood kategorik: self.cat_likelihoods[kelas][kolom][nilai] = peluang
         self.cat_likelihoods = {}
         # Parameter numerik: self.num_params[kelas][kolom] = (mean, variance)
         self.num_params = {}
-        # Nilai unik kategorik untuk Laplace smoothing
+        # List nilai unik kategori untuk Laplace smoothing
         self.cat_unique_vals = {}
 
     def fit(self, X, y):
         self.classes = sorted(y.unique().tolist())
         total_samples = len(y)
         
-        # 1. Hitung Prior Probability P(C) untuk setiap kelas
+        # Hitung peluang awal Prior P(C) untuk tiap kelas
         for cls in self.classes:
             self.priors[cls] = sum(y == cls) / total_samples
             
-        # Catat semua nilai unik pada fitur kategorikal dari data training
+        # Catat semua nilai kategori unik yang ada di data training
         for col in self.cat_cols:
             self.cat_unique_vals[col] = sorted(X[col].unique().tolist())
             
-        # 2. Hitung Likelihood Parameter per Kelas
+        # Hitung parameter likelihood per kelas
         for cls in self.classes:
             self.cat_likelihoods[cls] = {}
             self.num_params[cls] = {}
             
-            # Filter baris yang sesuai dengan kelas ini
+            # Filter baris yang sesuai kelas saat ini
             X_cls = X[y == cls]
             n_cls = len(X_cls)
             
-            # A. Fitur Kategorikal: Laplace Smoothing
+            # Fitur Kategorikal: Hitung pakai Laplace Smoothing
             for col in self.cat_cols:
                 self.cat_likelihoods[cls][col] = {}
                 counts = X_cls[col].value_counts()
                 unique_vals = self.cat_unique_vals[col]
-                k = len(unique_vals)  # Jumlah nilai unik untuk smoothing
+                k = len(unique_vals)  # Jumlah kategori unik
                 
                 for val in unique_vals:
                     val_count = counts.get(val, 0)
                     # Rumus Laplace: (count + 1) / (n_cls + k)
                     self.cat_likelihoods[cls][col][val] = (val_count + 1) / (n_cls + k)
             
-            # B. Fitur Numerik: Estimasi Mean (rata-rata) & Variance (variansi)
+            # Fitur Numerik: Hitung nilai rata-rata (mean) & variansi (variance)
             for col in self.num_cols:
                 mean = X_cls[col].mean()
                 var = X_cls[col].var()
-                # Jika variansi 0 (atau NaN karena data tunggal), beri nilai sangat kecil (epsilon)
+                # Kalau variansi 0, ganti angka super kecil biar ga pembagian nol
                 if var == 0 or pd.isna(var):
                     var = 1e-9
                 self.num_params[cls][col] = (mean, var)
 
     def _gaussian_pdf(self, x, mean, var):
-        """Menghitung probabilitas Gauss P(x | mean, var)"""
+        # Hitung rumus peluang distribusi normal Gauss
         exponent = math.exp(-((x - mean) ** 2) / (2 * var))
         return (1.0 / math.sqrt(2 * math.pi * var)) * exponent
 
     def predict_single(self, sample):
-        """Memprediksi kelas untuk satu sampel baris data"""
+        # Prediksi satu baris data
         log_scores = {}
         
         for cls in self.classes:
-            # Mulai dengan log dari Prior P(C)
+            # Mulai dari log prior P(C)
             log_prob = math.log(self.priors[cls])
             
-            # Tambahkan log-likelihood fitur kategorikal
+            # Tambah probabilitas log dari fitur kategorikal
             for col in self.cat_cols:
                 val = sample[col]
-                # Jika nilai ada di training likelihood, gunakan nilainya
                 if val in self.cat_likelihoods[cls][col]:
                     prob = self.cat_likelihoods[cls][col][val]
                 else:
-                    # Fallback Laplace jika ada kategori tak dikenal
+                    # Kalau ada nilai baru yang ga ada pas training, pakai fallback Laplace
                     k = len(self.cat_unique_vals[col])
                     prob = 1.0 / (k + 1)
                 log_prob += math.log(prob)
                 
-            # Tambahkan log-likelihood fitur numerik (Gaussian)
+            # Tambah probabilitas log dari fitur numerik (Gaussian)
             for col in self.num_cols:
                 val = float(sample[col])
                 mean, var = self.num_params[cls][col]
                 prob = self._gaussian_pdf(val, mean, var)
-                # Batasi probabilitas minimum untuk menghindari log(0)
+                # Batasin biar ga log(0)
                 if prob < 1e-15:
                     prob = 1e-15
                 log_prob += math.log(prob)
                 
             log_scores[cls] = log_prob
             
-        # Pilih kelas dengan log-probability tertinggi (argmax)
+        # Cari kelas dengan skor peluang paling gede (argmax)
         best_class = max(log_scores, key=log_scores.get)
         return best_class, log_scores
 
     def predict(self, X):
-        """Memprediksi kelas untuk seluruh baris data di DataFrame X"""
+        # Prediksi banyak data sekaligus
         predictions = []
         for _, row in X.iterrows():
             pred, _ = self.predict_single(row)
@@ -236,20 +233,19 @@ class MixedNaiveBayes:
         return predictions
 
 
-# ======================== 5. EVALUASI METRIKS ========================
+# 5. Evaluasi Metriks
 def calculate_metrics(y_true, y_pred):
     """
-    Menghitung metrik evaluasi klasifikasi biner dari nol (from scratch):
-    Akurasi, Presisi, Recall, F1-Score, dan Confusion Matrix.
+    Hitung metrik performa model (Akurasi, Presisi, Recall, F1) manual dari nol.
     """
     y_true = list(y_true)
     y_pred = list(y_pred)
     n = len(y_true)
     
-    tp = 0  # True Positive (Aktual 1, Prediksi 1)
-    fp = 0  # False Positive (Aktual 0, Prediksi 1)
-    tn = 0  # True Negative (Aktual 0, Prediksi 0)
-    fn = 0  # False Negative (Aktual 1, Prediksi 0)
+    tp = 0  # Tebak stres tinggi (1) dan aslinya stres tinggi (1)
+    fp = 0  # Tebak stres tinggi (1) padahal aslinya stres rendah (0)
+    tn = 0  # Tebak stres rendah (0) dan aslinya stres rendah (0)
+    fn = 0  # Tebak stres rendah (0) padahal aslinya stres tinggi (1)
     
     for t, p in zip(y_true, y_pred):
         if t == 1 and p == 1:
@@ -279,7 +275,7 @@ def calculate_metrics(y_true, y_pred):
 
 
 def print_evaluation_report(name, metrics):
-    """Mencetak laporan hasil metrik evaluasi secara rapi"""
+    # Cetak laporan metrik model biar keliatan rapi
     print("\n" + "=" * 50)
     print(f" LAPORAN EVALUASI: DATA {name.upper()}")
     print("=" * 50)
@@ -295,23 +291,23 @@ def print_evaluation_report(name, metrics):
     print("=" * 50)
 
 
-# ======================== 6. MAIN ORCHESTRATOR ========================
+# 6. Main Program
 def main():
     print("=" * 70)
     print("      SISTEM PREDIKSI TINGKAT STRES MAHASISWA")
     print("    Metode: Mixed Gaussian & Categorical Naive Bayes")
     print("=" * 70)
 
-    # 1. Load dan Preprocess Data
+    # Load dan preprocess data
     df = load_and_preprocess(FILEPATH)
     
-    # 2. Jalankan EDA
+    # Jalankan visualisasi info data (EDA)
     run_eda(df)
     
-    # 3. Split Dataset (70% Train, 15% Val, 15% Test)
+    # Bagi data jadi Train, Val, Test
     train_df, val_df, test_df = train_val_test_split(df)
     
-    # Kelompokkan Fitur berdasarkan tipe datanya
+    # Pisahin tipe fitur kategorik dan numerik
     cat_features = ["Student_Type"]
     num_features = [
         "Sleep_Hours",
@@ -323,7 +319,6 @@ def main():
         "Month"
     ]
     
-    # Pisahkan fitur dan label
     X_train = train_df[cat_features + num_features]
     y_train = train_df[TARGET_COL]
     
@@ -333,38 +328,38 @@ def main():
     X_test = test_df[cat_features + num_features]
     y_test = test_df[TARGET_COL]
 
-    # 4. Training (Fitting Model)
+    # Training model
     print("\n[STEP 4] Melatih model Naive Bayes...")
     model = MixedNaiveBayes(cat_cols=cat_features, num_cols=num_features)
     model.fit(X_train, y_train)
-    print("  -> Model berhasil dilatih pada data training!")
+    print("  -> Model kelar dilatih di data training!")
 
-    # Tampilkan Prior Probability hasil training
+    # Cek bobot awal prior kelas
     print("\nPrior Probability hasil training:")
     for cls in model.classes:
         label = "Rendah (0)" if cls == 0 else "Tinggi (1)"
         print(f"  P({label}) = {model.priors[cls]:.4f}")
 
-    # 5. Prediksi dan Evaluasi data Validation
+    # Tes performa ke data Validation
     print("\n[STEP 5] Evaluasi pada data Validation...")
     val_preds = model.predict(X_val)
     val_metrics = calculate_metrics(y_val, val_preds)
     print_evaluation_report("Validation", val_metrics)
 
-    # 6. Prediksi dan Evaluasi data Testing
+    # Tes performa ke data Testing
     print("\n[STEP 6] Evaluasi pada data Testing...")
     test_preds = model.predict(X_test)
     test_metrics = calculate_metrics(y_test, test_preds)
     print_evaluation_report("Testing", test_metrics)
 
-    # 7. Demo Uji Kasus Spesifik
+    # Tes prediksi dengan skenario sampel manual
     print("\n" + "=" * 70)
     print(" DEMO PREDIKSI KASUS KHUSUS (UJI)")
     print("=" * 70)
     
     uji_kasus = [
         {
-            # Kasus A: Beban kuliah tinggi, tidur kurang, support rendah
+            # Kasus A: Kuliah berat, kurang tidur, jarang disupport
             "Student_Type": "college",
             "Sleep_Hours": 4.5,
             "Study_Hours": 8.0,
@@ -375,7 +370,7 @@ def main():
             "Month": 5.0
         },
         {
-            # Kasus B: Kehidupan seimbang, tidur cukup, support tinggi
+            # Kasus B: Sekolah nyantai, tidur cukup, support keluarga oke
             "Student_Type": "school",
             "Sleep_Hours": 8.5,
             "Study_Hours": 3.0,
@@ -399,31 +394,31 @@ def main():
         print(f"    Persentase Kehadiran: {sample['Attendance']}%")
         print(f"    -> Hasil Prediksi   : ** {label_pred} **")
 
-    # 8. Menu Input Interaktif (jika di terminal interaktif)
+    # Input manual lewat konsol
     try:
         if not sys.stdin.isatty():
-            print("\n[INFO] Deteksi lingkungan non-interaktif. Melewati input interaktif.")
+            print("\n[INFO] Non-interactive environment. Skip ketik manual.")
         else:
             print("\n" + "=" * 70)
             print(" INPUT INTERAKTIF (UJI DATA BARU)")
             print("=" * 70)
-            tanya_user = input("Ingin mencoba prediksi data Anda sendiri? (y/n): ").strip().lower()
+            tanya_user = input("Mau coba ketik data kamu sendiri? (y/n): ").strip().lower()
             if tanya_user == 'y':
                 while True:
-                    print("\nSilakan masukkan data Anda:")
+                    print("\nKetik data kamu di bawah:")
                     try:
                         tipe = input("- Tipe Mahasiswa (college/school/working_student): ").strip().lower()
                         if tipe not in ['college', 'school', 'working_student']:
                             tipe = 'college'
-                            print("  (Input tidak valid, otomatis diset ke 'college')")
+                            print("  (Input salah, otomatis diganti ke 'college')")
                             
                         sleep = float(input("- Jam Tidur per Hari (misal 6.5): "))
                         study = float(input("- Jam Belajar per Hari (misal 4.0): "))
-                        socmed = float(input("- Jam Sosial Media per Hari (misal 2.0): "))
-                        attend = float(input("- Persentase Kehadiran Kelas (0 - 100): "))
+                        socmed = float(input("- Jam Medsos per Hari (misal 2.0): "))
+                        attend = float(input("- Kehadiran Kelas (0 - 100): "))
                         pressure = float(input("- Skala Tekanan Ujian (1 - 10): "))
-                        support = float(input("- Skala Dukungan Keluarga (1 - 10): "))
-                        month = float(input("- Bulan Akademik Saat Ini (1 - 12): "))
+                        support = float(input("- Skala Dukung Keluarga (1 - 10): "))
+                        month = float(input("- Bulan Akademik (1 - 12): "))
                         
                         user_sample = {
                             "Student_Type": tipe,
@@ -443,16 +438,16 @@ def main():
                         print(f"==========================================")
                         
                     except ValueError:
-                        print("  [ERROR] Masukan angka tidak valid. Silakan coba lagi.")
+                        print("  [ERROR] Masukan angka salah. Ulangi lagi.")
                         
-                    lagi = input("\nCoba data lain? (y/n): ").strip().lower()
+                    lagi = input("\nMau coba data lain? (y/n): ").strip().lower()
                     if lagi != 'y':
                         break
     except (EOFError, KeyboardInterrupt):
-        print("\nDemo interaktif dihentikan.")
+        print("\nInput manual dihentikan.")
 
     print("\n" + "=" * 70)
-    print("  Program Selesai. Terima kasih!")
+    print("  Program Selesai. Makasih!")
     print("=" * 70)
 
 
