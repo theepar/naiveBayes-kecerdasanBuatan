@@ -291,7 +291,69 @@ def print_evaluation_report(name, metrics):
     print("=" * 50)
 
 
-# 6. Main Program
+# 6. Ekspor & Impor Model ke berkas JSON
+def save_model_to_json(model, filename):
+    """
+    Menyimpan parameter model hasil training ke berkas JSON.
+    """
+    import json
+    model_data = {
+        "cat_cols": model.cat_cols,
+        "num_cols": model.num_cols,
+        "classes": model.classes,
+        "priors": model.priors,
+        "cat_likelihoods": model.cat_likelihoods,
+        "num_params": model.num_params,
+        "cat_unique_vals": model.cat_unique_vals
+    }
+    with open(filename, "w") as f:
+        json.dump(model_data, f, indent=4)
+    print(f"  -> Model berhasil diekspor ke '{filename}'")
+
+
+def load_model_from_json(filename):
+    """
+    Memuat kembali model Naive Bayes yang sudah dilatih dari berkas JSON.
+    """
+    import json
+    with open(filename, "r") as f:
+        data = json.load(f)
+        
+    model = MixedNaiveBayes(cat_cols=data["cat_cols"], num_cols=data["num_cols"])
+    model.classes = data["classes"]
+    
+    # Fungsi pembantu untuk mengembalikan kunci string dari JSON ke tipe aslinya (int/float)
+    def convert_key(k):
+        try:
+            if float(k).is_integer():
+                return int(k)
+            return float(k)
+        except ValueError:
+            return k
+            
+    # Kembalikan tipe data kunci P(C)
+    model.priors = {convert_key(k): v for k, v in data["priors"].items()}
+    
+    # Kembalikan tipe data kunci Likelihood kategorikal
+    model.cat_likelihoods = {}
+    for cls_str, cols_data in data["cat_likelihoods"].items():
+        cls = convert_key(cls_str)
+        model.cat_likelihoods[cls] = cols_data
+        
+    # Kembalikan tipe data kunci Parameter numerik (mean, variance)
+    model.num_params = {}
+    for cls_str, cols_data in data["num_params"].items():
+        cls = convert_key(cls_str)
+        model.num_params[cls] = {}
+        for col, params in cols_data.items():
+            model.num_params[cls][col] = (params[0], params[1])
+            
+    model.cat_unique_vals = data["cat_unique_vals"]
+    print(f"  -> Model berhasil dimuat dari '{filename}'")
+    return model
+
+
+# 7. Main Program
 def main():
     print("=" * 70)
     print("      SISTEM PREDIKSI TINGKAT STRES MAHASISWA")
@@ -334,6 +396,14 @@ def main():
     model.fit(X_train, y_train)
     print("  -> Model kelar dilatih di data training!")
 
+    # Ekspor model ke file JSON
+    print("\n[STEP 5] Mengekspor model hasil latihan ke JSON...")
+    save_model_to_json(model, "model_naive_bayes.json")
+
+    # Muat ulang model dari JSON untuk pembuktian
+    print("\n[STEP 6] Memuat ulang model dari berkas JSON...")
+    model = load_model_from_json("model_naive_bayes.json")
+
     # Cek bobot awal prior kelas
     print("\nPrior Probability hasil training:")
     for cls in model.classes:
@@ -341,13 +411,13 @@ def main():
         print(f"  P({label}) = {model.priors[cls]:.4f}")
 
     # Tes performa ke data Validation
-    print("\n[STEP 5] Evaluasi pada data Validation...")
+    print("\n[STEP 7] Evaluasi pada data Validation...")
     val_preds = model.predict(X_val)
     val_metrics = calculate_metrics(y_val, val_preds)
     print_evaluation_report("Validation", val_metrics)
 
     # Tes performa ke data Testing
-    print("\n[STEP 6] Evaluasi pada data Testing...")
+    print("\n[STEP 8] Evaluasi pada data Testing...")
     test_preds = model.predict(X_test)
     test_metrics = calculate_metrics(y_test, test_preds)
     print_evaluation_report("Testing", test_metrics)
@@ -394,7 +464,7 @@ def main():
         print(f"    Persentase Kehadiran: {sample['Attendance']}%")
         print(f"    -> Hasil Prediksi   : ** {label_pred} **")
 
-    # Input manual lewat konsol
+    # Input manual lewat konsol (aktif hanya jika dijalankan di terminal interaktif)
     try:
         if not sys.stdin.isatty():
             print("\n[INFO] Non-interactive environment. Skip ketik manual.")
