@@ -258,14 +258,22 @@ def calculate_metrics(y_true, y_pred):
             fn += 1
             
     accuracy = (tp + tn) / n if n > 0 else 0
+    error_rate = 1 - accuracy  # Tingkat Kesalahan = 1 - Akurasi
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0  # TPR / Sensitivity
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0  # TNR
+    fpr = fp / (tn + fp) if (tn + fp) > 0 else 0  # False Positive Rate
+    fnr = fn / (tp + fn) if (tp + fn) > 0 else 0  # False Negative Rate
     f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
     
     return {
         "accuracy": accuracy,
+        "error_rate": error_rate,
         "precision": precision,
         "recall": recall,
+        "specificity": specificity,
+        "fpr": fpr,
+        "fnr": fnr,
         "f1_score": f1,
         "tp": tp,
         "fp": fp,
@@ -276,19 +284,23 @@ def calculate_metrics(y_true, y_pred):
 
 def print_evaluation_report(name, metrics):
     # Cetak laporan metrik model biar keliatan rapi
-    print("\n" + "=" * 50)
+    print("\n" + "=" * 60)
     print(f" LAPORAN EVALUASI: DATA {name.upper()}")
-    print("=" * 50)
-    print(f"  Akurasi   : {metrics['accuracy'] * 100:.2f}%")
-    print(f"  Presisi   : {metrics['precision'] * 100:.2f}%")
-    print(f"  Recall    : {metrics['recall'] * 100:.2f}%")
-    print(f"  F1-Score  : {metrics['f1_score'] * 100:.2f}%")
-    print("-" * 50)
+    print("=" * 60)
+    print(f"  Akurasi (ACC)          : {metrics['accuracy'] * 100:.2f}%")
+    print(f"  Error Rate (1-ACC)     : {metrics['error_rate'] * 100:.2f}%")
+    print(f"  Presisi                : {metrics['precision'] * 100:.2f}%")
+    print(f"  Recall / TPR           : {metrics['recall'] * 100:.2f}%")
+    print(f"  Specificity / TNR      : {metrics['specificity'] * 100:.2f}%")
+    print(f"  False Positive Rate    : {metrics['fpr'] * 100:.2f}%")
+    print(f"  False Negative Rate    : {metrics['fnr'] * 100:.2f}%")
+    print(f"  F1-Score               : {metrics['f1_score'] * 100:.2f}%")
+    print("-" * 60)
     print("  Confusion Matrix:")
     print("                      Prediksi: Rendah (0)    Prediksi: Tinggi (1)")
     print(f"  Aktual: Rendah (0)         {metrics['tn']:^10}               {metrics['fp']:^10}")
     print(f"  Aktual: Tinggi (1)         {metrics['fn']:^10}               {metrics['tp']:^10}")
-    print("=" * 50)
+    print("=" * 60)
 
 
 # 6. Ekspor & Impor Model ke berkas JSON
@@ -353,76 +365,11 @@ def load_model_from_json(filename):
     return model
 
 
-# 7. Main Program
-def main():
-    print("=" * 70)
-    print("      SISTEM PREDIKSI TINGKAT STRES MAHASISWA")
-    print("    Metode: Mixed Gaussian & Categorical Naive Bayes")
-    print("=" * 70)
-
-    # Load dan preprocess data
-    df = load_and_preprocess(FILEPATH)
-    
-    # Jalankan visualisasi info data (EDA)
-    run_eda(df)
-    
-    # Bagi data jadi Train, Val, Test
-    train_df, val_df, test_df = train_val_test_split(df)
-    
-    # Pisahin tipe fitur kategorik dan numerik
-    cat_features = ["Student_Type"]
-    num_features = [
-        "Sleep_Hours",
-        "Study_Hours",
-        "Social_Media_Hours",
-        "Attendance",
-        "Exam_Pressure",
-        "Family_Support",
-        "Month"
-    ]
-    
-    X_train = train_df[cat_features + num_features]
-    y_train = train_df[TARGET_COL]
-    
-    X_val = val_df[cat_features + num_features]
-    y_val = val_df[TARGET_COL]
-    
-    X_test = test_df[cat_features + num_features]
-    y_test = test_df[TARGET_COL]
-
-    # Training model
-    print("\n[STEP 4] Melatih model Naive Bayes...")
-    model = MixedNaiveBayes(cat_cols=cat_features, num_cols=num_features)
-    model.fit(X_train, y_train)
-    print("  -> Model kelar dilatih di data training!")
-
-    # Ekspor model ke file JSON
-    print("\n[STEP 5] Mengekspor model hasil latihan ke JSON...")
-    save_model_to_json(model, "model_naive_bayes.json")
-
-    # Muat ulang model dari JSON untuk pembuktian
-    print("\n[STEP 6] Memuat ulang model dari berkas JSON...")
-    model = load_model_from_json("model_naive_bayes.json")
-
-    # Cek bobot awal prior kelas
-    print("\nPrior Probability hasil training:")
-    for cls in model.classes:
-        label = "Rendah (0)" if cls == 0 else "Tinggi (1)"
-        print(f"  P({label}) = {model.priors[cls]:.4f}")
-
-    # Tes performa ke data Validation
-    print("\n[STEP 7] Evaluasi pada data Validation...")
-    val_preds = model.predict(X_val)
-    val_metrics = calculate_metrics(y_val, val_preds)
-    print_evaluation_report("Validation", val_metrics)
-
-    # Tes performa ke data Testing
-    print("\n[STEP 8] Evaluasi pada data Testing...")
-    test_preds = model.predict(X_test)
-    test_metrics = calculate_metrics(y_test, test_preds)
-    print_evaluation_report("Testing", test_metrics)
-
-    # Tes prediksi dengan skenario sampel manual
+# 7. Demo Prediksi Kasus Khusus
+def run_demo_predictions(model):
+    """
+    Menjalankan demo prediksi dengan data sampel yang sudah disiapkan.
+    """
     print("\n" + "=" * 70)
     print(" DEMO PREDIKSI KASUS KHUSUS (UJI)")
     print("=" * 70)
@@ -464,57 +411,230 @@ def main():
         print(f"    Persentase Kehadiran: {sample['Attendance']}%")
         print(f"    -> Hasil Prediksi   : ** {label_pred} **")
 
-    # Input manual lewat konsol (aktif hanya jika dijalankan di terminal interaktif)
+
+# 8. Input Manual Interaktif
+def run_interactive_input(model):
+    """
+    Memungkinkan user mengetik data sendiri lewat konsol untuk diprediksi.
+    """
     try:
         if not sys.stdin.isatty():
             print("\n[INFO] Non-interactive environment. Skip ketik manual.")
-        else:
-            print("\n" + "=" * 70)
-            print(" INPUT INTERAKTIF (UJI DATA BARU)")
-            print("=" * 70)
-            tanya_user = input("Mau coba ketik data kamu sendiri? (y/n): ").strip().lower()
-            if tanya_user == 'y':
-                while True:
-                    print("\nKetik data kamu di bawah:")
-                    try:
-                        tipe = input("- Tipe Mahasiswa (college/school/working_student): ").strip().lower()
-                        if tipe not in ['college', 'school', 'working_student']:
-                            tipe = 'college'
-                            print("  (Input salah, otomatis diganti ke 'college')")
-                            
-                        sleep = float(input("- Jam Tidur per Hari (misal 6.5): "))
-                        study = float(input("- Jam Belajar per Hari (misal 4.0): "))
-                        socmed = float(input("- Jam Medsos per Hari (misal 2.0): "))
-                        attend = float(input("- Kehadiran Kelas (0 - 100): "))
-                        pressure = float(input("- Skala Tekanan Ujian (1 - 10): "))
-                        support = float(input("- Skala Dukung Keluarga (1 - 10): "))
-                        month = float(input("- Bulan Akademik (1 - 12): "))
+            return
+            
+        print("\n" + "=" * 70)
+        print(" INPUT INTERAKTIF (UJI DATA BARU)")
+        print("=" * 70)
+        tanya_user = input("Mau coba ketik data kamu sendiri? (y/n): ").strip().lower()
+        if tanya_user == 'y':
+            while True:
+                print("\nKetik data kamu di bawah:")
+                try:
+                    tipe = input("- Tipe Mahasiswa (college/school/working_student): ").strip().lower()
+                    if tipe not in ['college', 'school', 'working_student']:
+                        tipe = 'college'
+                        print("  (Input salah, otomatis diganti ke 'college')")
                         
-                        user_sample = {
-                            "Student_Type": tipe,
-                            "Sleep_Hours": sleep,
-                            "Study_Hours": study,
-                            "Social_Media_Hours": socmed,
-                            "Attendance": attend,
-                            "Exam_Pressure": pressure,
-                            "Family_Support": support,
-                            "Month": month
-                        }
-                        
-                        pred, _ = model.predict_single(user_sample)
-                        label_pred = "TINGKAT STRES TINGGI (1)" if pred == 1 else "TINGKAT STRES RENDAH (0)"
-                        print(f"\n==========================================")
-                        print(f"HASIL PREDIKSI: {label_pred}")
-                        print(f"==========================================")
-                        
-                    except ValueError:
-                        print("  [ERROR] Masukan angka salah. Ulangi lagi.")
-                        
-                    lagi = input("\nMau coba data lain? (y/n): ").strip().lower()
-                    if lagi != 'y':
-                        break
+                    sleep = float(input("- Jam Tidur per Hari (misal 6.5): "))
+                    study = float(input("- Jam Belajar per Hari (misal 4.0): "))
+                    socmed = float(input("- Jam Medsos per Hari (misal 2.0): "))
+                    attend = float(input("- Kehadiran Kelas (0 - 100): "))
+                    pressure = float(input("- Skala Tekanan Ujian (1 - 10): "))
+                    support = float(input("- Skala Dukung Keluarga (1 - 10): "))
+                    month = float(input("- Bulan Akademik (1 - 12): "))
+                    
+                    user_sample = {
+                        "Student_Type": tipe,
+                        "Sleep_Hours": sleep,
+                        "Study_Hours": study,
+                        "Social_Media_Hours": socmed,
+                        "Attendance": attend,
+                        "Exam_Pressure": pressure,
+                        "Family_Support": support,
+                        "Month": month
+                    }
+                    
+                    pred, _ = model.predict_single(user_sample)
+                    label_pred = "TINGKAT STRES TINGGI (1)" if pred == 1 else "TINGKAT STRES RENDAH (0)"
+                    print(f"\n==========================================")
+                    print(f"HASIL PREDIKSI: {label_pred}")
+                    print(f"==========================================")
+                    
+                except ValueError:
+                    print("  [ERROR] Masukan angka salah. Ulangi lagi.")
+                    
+                lagi = input("\nMau coba data lain? (y/n): ").strip().lower()
+                if lagi != 'y':
+                    break
     except (EOFError, KeyboardInterrupt):
         print("\nInput manual dihentikan.")
+
+
+# 9. Mode 1: Training dari Awal
+def mode_train_from_scratch():
+    """
+    Alur lengkap: Load data -> Preprocess -> EDA -> Split -> Training -> Evaluasi -> Ekspor JSON.
+    """
+    # Load dan preprocess data
+    df = load_and_preprocess(FILEPATH)
+    
+    # Jalankan visualisasi info data (EDA)
+    run_eda(df)
+    
+    # Bagi data jadi Train, Val, Test
+    train_df, val_df, test_df = train_val_test_split(df)
+    
+    # Pisahin tipe fitur kategorik dan numerik
+    cat_features = ["Student_Type"]
+    num_features = [
+        "Sleep_Hours",
+        "Study_Hours",
+        "Social_Media_Hours",
+        "Attendance",
+        "Exam_Pressure",
+        "Family_Support",
+        "Month"
+    ]
+    
+    X_train = train_df[cat_features + num_features]
+    y_train = train_df[TARGET_COL]
+    
+    X_val = val_df[cat_features + num_features]
+    y_val = val_df[TARGET_COL]
+    
+    X_test = test_df[cat_features + num_features]
+    y_test = test_df[TARGET_COL]
+
+    # Training model
+    print("\n[STEP 4] Melatih model Naive Bayes...")
+    model = MixedNaiveBayes(cat_cols=cat_features, num_cols=num_features)
+    model.fit(X_train, y_train)
+    print("  -> Model kelar dilatih di data training!")
+
+    # Ekspor model ke file JSON
+    print("\n[STEP 5] Mengekspor model hasil latihan ke JSON...")
+    save_model_to_json(model, "model_naive_bayes.json")
+
+    # Cek bobot awal prior kelas
+    print("\nPrior Probability hasil training:")
+    for cls in model.classes:
+        label = "Rendah (0)" if cls == 0 else "Tinggi (1)"
+        print(f"  P({label}) = {model.priors[cls]:.4f}")
+
+    # Tes performa ke data Validation
+    print("\n[STEP 6] Evaluasi pada data Validation...")
+    val_preds = model.predict(X_val)
+    val_metrics = calculate_metrics(y_val, val_preds)
+    print_evaluation_report("Validation", val_metrics)
+
+    # Tes performa ke data Testing
+    print("\n[STEP 7] Evaluasi pada data Testing...")
+    test_preds = model.predict(X_test)
+    test_metrics = calculate_metrics(y_test, test_preds)
+    print_evaluation_report("Testing", test_metrics)
+
+    # Demo prediksi & input interaktif
+    run_demo_predictions(model)
+    run_interactive_input(model)
+
+
+# 10. Mode 2: Muat Model dari Berkas JSON
+def mode_load_from_json():
+    """
+    Alur cepat: Langsung muat model yang sudah dilatih dari file JSON, lalu evaluasi & prediksi.
+    """
+    json_file = "model_naive_bayes.json"
+    
+    if not os.path.exists(json_file):
+        print(f"\n  [ERROR] File model '{json_file}' tidak ditemukan!")
+        print("  Jalankan Mode 1 (Training dari Awal) dulu untuk membuat file model.")
+        return
+    
+    print(f"\n[STEP 1] Memuat model dari berkas '{json_file}'...")
+    model = load_model_from_json(json_file)
+    
+    # Cek bobot awal prior kelas
+    print("\nPrior Probability dari model JSON:")
+    for cls in model.classes:
+        label = "Rendah (0)" if cls == 0 else "Tinggi (1)"
+        print(f"  P({label}) = {model.priors[cls]:.4f}")
+    
+    # Load data untuk evaluasi
+    print(f"\n[STEP 2] Memuat dataset untuk evaluasi...")
+    df = load_and_preprocess(FILEPATH)
+    
+    # Bagi data (pakai seed yang sama supaya split konsisten)
+    train_df, val_df, test_df = train_val_test_split(df)
+    
+    cat_features = ["Student_Type"]
+    num_features = [
+        "Sleep_Hours",
+        "Study_Hours",
+        "Social_Media_Hours",
+        "Attendance",
+        "Exam_Pressure",
+        "Family_Support",
+        "Month"
+    ]
+    
+    X_val = val_df[cat_features + num_features]
+    y_val = val_df[TARGET_COL]
+    
+    X_test = test_df[cat_features + num_features]
+    y_test = test_df[TARGET_COL]
+    
+    # Evaluasi pada data Validation
+    print("\n[STEP 3] Evaluasi model JSON pada data Validation...")
+    val_preds = model.predict(X_val)
+    val_metrics = calculate_metrics(y_val, val_preds)
+    print_evaluation_report("Validation (Model JSON)", val_metrics)
+    
+    # Evaluasi pada data Testing
+    print("\n[STEP 4] Evaluasi model JSON pada data Testing...")
+    test_preds = model.predict(X_test)
+    test_metrics = calculate_metrics(y_test, test_preds)
+    print_evaluation_report("Testing (Model JSON)", test_metrics)
+    
+    # Demo prediksi & input interaktif
+    run_demo_predictions(model)
+    run_interactive_input(model)
+
+
+# 11. Main Program (Menu Utama)
+def main():
+    print("=" * 70)
+    print("      SISTEM PREDIKSI TINGKAT STRES MAHASISWA")
+    print("    Metode: Mixed Gaussian & Categorical Naive Bayes")
+    print("=" * 70)
+    
+    print("\n  Pilih mode yang ingin dijalankan:")
+    print("  [1] Training dari Awal (Load Data -> Training -> Evaluasi -> Ekspor JSON)")
+    print("  [2] Muat Model dari JSON (Langsung pakai model yang sudah dilatih)")
+    
+    try:
+        if not sys.stdin.isatty():
+            # Non-interactive: default ke Mode 1
+            print("\n  [INFO] Non-interactive environment. Otomatis jalankan Mode 1.")
+            pilihan = "1"
+        else:
+            pilihan = input("\n  Masukkan pilihan (1/2): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print("\n  Input dibatalkan.")
+        return
+    
+    if pilihan == "1":
+        print("\n" + "-" * 70)
+        print("  >> Mode 1: TRAINING DARI AWAL")
+        print("-" * 70)
+        mode_train_from_scratch()
+    elif pilihan == "2":
+        print("\n" + "-" * 70)
+        print("  >> Mode 2: MUAT MODEL DARI JSON")
+        print("-" * 70)
+        mode_load_from_json()
+    else:
+        print("\n  [ERROR] Pilihan tidak valid. Masukkan 1 atau 2.")
+        return
 
     print("\n" + "=" * 70)
     print("  Program Selesai. Makasih!")
