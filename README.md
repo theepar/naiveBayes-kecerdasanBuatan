@@ -1,6 +1,6 @@
-# Student Stress Prediction using Mixed Naive Bayes
+# Student Stress Prediction using Naive Bayes
 
-Proyek ini adalah implementasi sistem prediksi tingkat stres mahasiswa (`Stress_Level`: 0 untuk Rendah, 1 untuk Tinggi) menggunakan metode **Mixed Naive Bayes Classifier** yang dibangun dari nol (_from scratch_) tanpa menggunakan pustaka _machine learning_ eksternal seperti `scikit-learn`.
+Proyek ini adalah implementasi sistem prediksi tingkat stres mahasiswa (`Stress_Level`: 0 untuk Rendah, 1 untuk Tinggi) menggunakan metode **Naive Bayes Classifier** yang dibangun dari nol (_from scratch_) tanpa menggunakan pustaka _machine learning_ eksternal seperti `scikit-learn`.
 
 Model ini dirancang khusus untuk menangani tipe data campuran:
 
@@ -12,8 +12,8 @@ Model ini dirancang khusus untuk menangani tipe data campuran:
 ## Struktur File Proyek
 
 - **`main.py`**: Program utama proyek dengan sistem menu interaktif. Menyediakan dua mode operasi:
-  - **Mode 1** — Training dari awal (load data → preprocessing → EDA → training → evaluasi → ekspor JSON).
-  - **Mode 2** — Muat model dari berkas JSON yang sudah dilatih sebelumnya, lalu langsung evaluasi & prediksi tanpa training ulang.
+  - **Mode 1** — Training & Ekspor Model (load data → preprocessing → split → training → ekspor JSON).
+  - **Mode 2** — Muat Model & Evaluasi (muat JSON → load data → EDA → split → evaluasi Validation & Testing → demo prediksi).
 - **`model_naive_bayes.json`**: Berkas JSON hasil ekspor parameter model (bobot prior, mean, variansi, dan tabel peluang kategorikal).
 - **`student_lifestyle_dataset.csv`**: File dataset lokal yang berisi data riwayat aktivitas mahasiswa dan tingkat stresnya.
 
@@ -43,17 +43,17 @@ Setelah dijalankan, akan muncul menu pilihan:
 
 ```
   Pilih mode yang ingin dijalankan:
-  [1] Training dari Awal (Load Data -> Training -> Evaluasi -> Ekspor JSON)
-  [2] Muat Model dari JSON (Langsung pakai model yang sudah dilatih)
+  [1] Training & Ekspor Model ke JSON
+  [2] Muat Model JSON & Evaluasi (Gunakan Model)
 ```
 
-### Mode 1: Training dari Awal
+### Mode 1: Training & Ekspor Model
 
-Memproses seluruh pipeline dari awal: memuat dataset, membersihkan data kosong (_imputasi_), menampilkan analisis data (EDA), membagi dataset (70% Training, 15% Validation, 15% Testing), melatih model Naive Bayes, mengekspor model ke JSON, dan mengevaluasi performa model. Di akhir tersedia demo prediksi dan input data manual secara interaktif.
+Melatih model Naive Bayes menggunakan data training hasil pemisahan (70%) dari dataset, lalu menyimpannya langsung ke berkas `model_naive_bayes.json`. Tidak ada evaluasi performa atau demo prediksi di mode ini. Setelah alur selesai, program akan menanyakan secara interaktif apakah Anda ingin langsung melanjutkan ke **Mode 2** (`y/n`).
 
-### Mode 2: Muat Model dari JSON
+### Mode 2: Muat Model & Evaluasi
 
-Memuat model yang sudah dilatih langsung dari berkas `model_naive_bayes.json` tanpa proses training ulang, lalu menjalankan evaluasi pada data Validation & Testing untuk membuktikan bahwa ekspor/impor model berjalan sempurna. Fitur demo prediksi dan input interaktif juga tersedia.
+Memuat model yang sudah dilatih langsung dari berkas `model_naive_bayes.json` tanpa proses training ulang. Selanjutnya, memuat seluruh dataset untuk menampilkan Analisis Eksplorasi Data (EDA), memisahkan data pengujian (Validation & Testing), menghitung seluruh metrik performa model pada data pengujian, serta menampilkan demo prediksi untuk kasus uji khusus.
 
 ---
 
@@ -61,38 +61,41 @@ Memuat model yang sudah dilatih langsung dari berkas `model_naive_bayes.json` ta
 
 Laporan evaluasi model mencakup metrik-metrik berikut:
 
-| Metrik | Rumus | Keterangan |
-|---|---|---|
-| **Accuracy** | `(TP + TN) / (TP + TN + FP + FN)` | Rasio prediksi benar dari total data |
-| **Error Rate** | `1 - Accuracy` | Tingkat kesalahan prediksi |
-| **Precision** | `TP / (TP + FP)` | Ketepatan prediksi positif |
-| **Recall / TPR** | `TP / (TP + FN)` | Sensitivitas mendeteksi kelas positif |
-| **Specificity / TNR** | `TN / (TN + FP)` | Kemampuan mendeteksi kelas negatif |
-| **False Positive Rate** | `FP / (TN + FP)` | Rasio kesalahan prediksi positif |
-| **False Negative Rate** | `FN / (TP + FN)` | Rasio kesalahan prediksi negatif |
-| **F1-Score** | `2 × (Precision × Recall) / (Precision + Recall)` | Keseimbangan Precision dan Recall |
+| Metrik                  | Rumus                                             | Keterangan                            |
+| ----------------------- | ------------------------------------------------- | ------------------------------------- |
+| **Accuracy**            | `(TP + TN) / (TP + TN + FP + FN)`                 | Rasio prediksi benar dari total data  |
+| **Error Rate**          | `1 - Accuracy`                                    | Tingkat kesalahan prediksi            |
+| **Precision**           | `TP / (TP + FP)`                                  | Ketepatan prediksi positif            |
+| **Recall / TPR**        | `TP / (TP + FN)`                                  | Sensitivitas mendeteksi kelas positif |
+| **Specificity / TNR**   | `TN / (TN + FP)`                                  | Kemampuan mendeteksi kelas negatif    |
+| **False Positive Rate** | `FP / (TN + FP)`                                  | Rasio kesalahan prediksi positif      |
+| **False Negative Rate** | `FN / (TP + FN)`                                  | Rasio kesalahan prediksi negatif      |
+| **F1-Score**            | `2 × (Precision × Recall) / (Precision + Recall)` | Keseimbangan Precision dan Recall     |
 
 ---
 
 ## Performa Model
 
-Evaluasi model pada data **Testing (15%)** yang belum pernah dilihat menghasilkan metrik performa sebagai berikut:
+Evaluasi model pada data **Testing (15%)** yang belum pernah dilihat dengan konfigurasi `THRESHOLD_OFFSET = -0.5` (untuk meminimalkan False Negative) menghasilkan metrik performa sebagai berikut:
 
-| Metrik | Skor |
-|---|---|
-| Akurasi (ACC) | `81.54%` |
-| Error Rate | `18.46%` |
-| Presisi | `73.75%` |
-| Recall / TPR | `60.93%` |
-| Specificity / TNR | `90.54%` |
-| False Positive Rate | `9.46%` |
-| False Negative Rate | `39.07%` |
-| F1-Score | `66.73%` |
+| Metrik              | Skor     |
+| ------------------- | -------- |
+| Akurasi (ACC)       | `80.52%` |
+| Error Rate          | `19.48%` |
+| Presisi             | `65.69%` |
+| Recall / TPR        | `75.13%` |
+| Specificity / TNR   | `82.88%` |
+| False Positive Rate | `17.12%` |
+| False Negative Rate | `24.87%` |
+| F1-Score            | `70.09%` |
 
 ### Confusion Matrix (Data Testing):
 
 ```text
                       Prediksi: Rendah (0)    Prediksi: Tinggi (1)
-  Aktual: Rendah (0)            2411                     252
-  Aktual: Tinggi (1)            454                      708
+  Aktual: Rendah (0)            2207                     456
+  Aktual: Tinggi (1)            289                      873
 ```
+
+> [!TIP]
+> Nilai `THRESHOLD_OFFSET = -0.5` dikonfigurasi di bagian atas berkas [main.py](file:///d:/Kodingan\python\naive-bayes\main.py). Pengaturan ini menggeser batas keputusan (_decision boundary_) log-posterior sebesar `-0.5` untuk membuat model lebih sensitif terhadap deteksi kelas stres tinggi (1), sehingga menekan **False Negative** dari **454** menjadi hanya **289** (penurunan sebesar ~36%) dan meningkatkan **F1-Score** secara keseluruhan dari **66.73%** menjadi **70.09%**.

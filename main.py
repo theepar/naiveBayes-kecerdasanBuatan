@@ -1,13 +1,12 @@
 import os
 import math
-import random
 import sys
 import pandas as pd
 
-# Konfigurasi dasar
 FILEPATH = "student_lifestyle_dataset.csv"
 TARGET_COL = "Stress_Level"
 RANDOM_SEED = 42
+THRESHOLD_OFFSET = -0.5
 
 
 # 1. Load & Preprocess Data
@@ -17,7 +16,6 @@ def load_and_preprocess(filepath):
     """
     print(f"\n[STEP 1] Memuat dataset dari '{filepath}'...")
     
-    # Kalau file csv lokal ga ada, download dulu dari kagglehub
     if not os.path.exists(filepath):
         print(f"  [INFO] File '{filepath}' ga ada di lokal.")
         print("  [INFO] Coba download dataset dari Kaggle pakai kagglehub...")
@@ -53,7 +51,7 @@ def load_and_preprocess(filepath):
     # Isi kolom numerik yang kosong pake rata-rata (Mean)
     num_cols = df.select_dtypes(include=["number"]).columns.tolist()
     if TARGET_COL in num_cols:
-        num_cols.remove(TARGET_COL)  # Skip target biar ga ke-impute
+        num_cols.remove(TARGET_COL) 
     
     for col in num_cols:
         missing_num = df[col].isnull().sum()
@@ -105,7 +103,6 @@ def train_val_test_split(df, train_ratio=0.70, val_ratio=0.15, test_ratio=0.15, 
     """
     print(f"\n[STEP 3] Membagi data (Train: {train_ratio*100:.0f}%, Val: {val_ratio*100:.0f}%, Test: {test_ratio*100:.0f}%)...")
     
-    # Shuffle data biar acak merata
     shuffled_df = df.sample(frac=1, random_state=seed).reset_index(drop=True)
     
     n = len(shuffled_df)
@@ -123,8 +120,8 @@ def train_val_test_split(df, train_ratio=0.70, val_ratio=0.15, test_ratio=0.15, 
     return train_df, val_df, test_df
 
 
-# 4. Mixed Naive Bayes Classifier
-class MixedNaiveBayes:
+# 4. Naive Bayes Classifier
+class NaiveBayes:
     """
     Model Naive Bayes bisa nanganin data campuran:
     - Kategorikal pakai frekuensi tabel dengan Laplace Smoothing.
@@ -147,88 +144,93 @@ class MixedNaiveBayes:
         total_samples = len(y)
         
         # Hitung peluang awal Prior P(C) untuk tiap kelas
-        for cls in self.classes:
-            self.priors[cls] = sum(y == cls) / total_samples
+        for class_label in self.classes:
+            self.priors[class_label] = sum(y == class_label) / total_samples
             
         # Catat semua nilai kategori unik yang ada di data training
-        for col in self.cat_cols:
-            self.cat_unique_vals[col] = sorted(X[col].unique().tolist())
+        for feature_name in self.cat_cols:
+            self.cat_unique_vals[feature_name] = sorted(X[feature_name].unique().tolist())
             
         # Hitung parameter likelihood per kelas
-        for cls in self.classes:
-            self.cat_likelihoods[cls] = {}
-            self.num_params[cls] = {}
+        for class_label in self.classes:
+            self.cat_likelihoods[class_label] = {}
+            self.num_params[class_label] = {}
             
             # Filter baris yang sesuai kelas saat ini
-            X_cls = X[y == cls]
-            n_cls = len(X_cls)
+            X_class = X[y == class_label]
+            class_sample_count = len(X_class)
             
             # Fitur Kategorikal: Hitung pakai Laplace Smoothing
-            for col in self.cat_cols:
-                self.cat_likelihoods[cls][col] = {}
-                counts = X_cls[col].value_counts()
-                unique_vals = self.cat_unique_vals[col]
-                k = len(unique_vals)  # Jumlah kategori unik
+            for feature_name in self.cat_cols:
+                self.cat_likelihoods[class_label][feature_name] = {}
+                counts = X_class[feature_name].value_counts()
+                unique_vals = self.cat_unique_vals[feature_name]
+                category_count = len(unique_vals)  # Jumlah kategori unik
                 
-                for val in unique_vals:
-                    val_count = counts.get(val, 0)
-                    # Rumus Laplace: (count + 1) / (n_cls + k)
-                    self.cat_likelihoods[cls][col][val] = (val_count + 1) / (n_cls + k)
+                for feature_value in unique_vals:
+                    val_count = counts.get(feature_value, 0)
+                    # Rumus Laplace: (count + 1) / (class_sample_count + category_count)
+                    self.cat_likelihoods[class_label][feature_name][feature_value] = (val_count + 1) / (class_sample_count + category_count)
             
             # Fitur Numerik: Hitung nilai rata-rata (mean) & variansi (variance)
-            for col in self.num_cols:
-                mean = X_cls[col].mean()
-                var = X_cls[col].var()
+            for feature_name in self.num_cols:
+                mean_val = X_class[feature_name].mean()
+                variance = X_class[feature_name].var()
                 # Kalau variansi 0, ganti angka super kecil biar ga pembagian nol
-                if var == 0 or pd.isna(var):
-                    var = 1e-9
-                self.num_params[cls][col] = (mean, var)
+                if variance == 0 or pd.isna(variance):
+                    variance = 1e-9
+                self.num_params[class_label][feature_name] = (mean_val, variance)
 
-    def _gaussian_pdf(self, x, mean, var):
+    def _gaussian_pdf(self, x, mean_val, variance):
         # Hitung rumus peluang distribusi normal Gauss
-        exponent = math.exp(-((x - mean) ** 2) / (2 * var))
-        return (1.0 / math.sqrt(2 * math.pi * var)) * exponent
+        exponent = math.exp(-((x - mean_val) ** 2) / (2 * variance))
+        return (1.0 / math.sqrt(2 * math.pi * variance)) * exponent
 
-    def predict_single(self, sample):
+    def predict_single(self, sample, threshold_offset=0.0):
         # Prediksi satu baris data
         log_scores = {}
         
-        for cls in self.classes:
+        for class_label in self.classes:
             # Mulai dari log prior P(C)
-            log_prob = math.log(self.priors[cls])
+            log_prob = math.log(self.priors[class_label])
             
             # Tambah probabilitas log dari fitur kategorikal
-            for col in self.cat_cols:
-                val = sample[col]
-                if val in self.cat_likelihoods[cls][col]:
-                    prob = self.cat_likelihoods[cls][col][val]
+            for feature_name in self.cat_cols:
+                feature_value = sample[feature_name]
+                if feature_value in self.cat_likelihoods[class_label][feature_name]:
+                    probability = self.cat_likelihoods[class_label][feature_name][feature_value]
                 else:
                     # Kalau ada nilai baru yang ga ada pas training, pakai fallback Laplace
-                    k = len(self.cat_unique_vals[col])
-                    prob = 1.0 / (k + 1)
-                log_prob += math.log(prob)
+                    category_count = len(self.cat_unique_vals[feature_name])
+                    probability = 1.0 / (category_count + 1)
+                log_prob += math.log(probability)
                 
             # Tambah probabilitas log dari fitur numerik (Gaussian)
-            for col in self.num_cols:
-                val = float(sample[col])
-                mean, var = self.num_params[cls][col]
-                prob = self._gaussian_pdf(val, mean, var)
+            for feature_name in self.num_cols:
+                feature_value = float(sample[feature_name])
+                mean_val, variance = self.num_params[class_label][feature_name]
+                probability = self._gaussian_pdf(feature_value, mean_val, variance)
                 # Batasin biar ga log(0)
-                if prob < 1e-15:
-                    prob = 1e-15
-                log_prob += math.log(prob)
+                if probability < 1e-15:
+                    probability = 1e-15
+                log_prob += math.log(probability)
                 
-            log_scores[cls] = log_prob
+            log_scores[class_label] = log_prob
             
-        # Cari kelas dengan skor peluang paling gede (argmax)
-        best_class = max(log_scores, key=log_scores.get)
-        return best_class, log_scores
+        # Jika klasifikasi biner 0 dan 1, gunakan threshold_offset untuk meminimalkan False Negative
+        if len(self.classes) == 2 and self.classes == [0, 1]:
+            if log_scores[1] - log_scores[0] > threshold_offset:
+                return 1, log_scores
+            else:
+                return 0, log_scores
+        else:
+            best_class = max(log_scores, key=log_scores.get)
+            return best_class, log_scores
 
-    def predict(self, X):
-        # Prediksi banyak data sekaligus
+    def predict(self, X, threshold_offset=0.0):
         predictions = []
         for _, row in X.iterrows():
-            pred, _ = self.predict_single(row)
+            pred, _ = self.predict_single(row, threshold_offset)
             predictions.append(pred)
         return predictions
 
@@ -238,33 +240,33 @@ def calculate_metrics(y_true, y_pred):
     """
     Hitung metrik performa model (Akurasi, Presisi, Recall, F1) manual dari nol.
     """
-    y_true = list(y_true)
-    y_pred = list(y_pred)
-    n = len(y_true)
+    actual_labels = list(y_true)
+    predicted_labels = list(y_pred)
+    total_samples = len(actual_labels)
     
-    tp = 0  # Tebak stres tinggi (1) dan aslinya stres tinggi (1)
-    fp = 0  # Tebak stres tinggi (1) padahal aslinya stres rendah (0)
-    tn = 0  # Tebak stres rendah (0) dan aslinya stres rendah (0)
-    fn = 0  # Tebak stres rendah (0) padahal aslinya stres tinggi (1)
+    true_positives = 0
+    false_positives = 0
+    true_negatives = 0
+    false_negatives = 0
     
-    for t, p in zip(y_true, y_pred):
-        if t == 1 and p == 1:
-            tp += 1
-        elif t == 0 and p == 1:
-            fp += 1
-        elif t == 0 and p == 0:
-            tn += 1
-        elif t == 1 and p == 0:
-            fn += 1
+    for actual_val, predicted_val in zip(actual_labels, predicted_labels):
+        if actual_val == 1 and predicted_val == 1:
+            true_positives += 1
+        elif actual_val == 0 and predicted_val == 1:
+            false_positives += 1
+        elif actual_val == 0 and predicted_val == 0:
+            true_negatives += 1
+        elif actual_val == 1 and predicted_val == 0:
+            false_negatives += 1
             
-    accuracy = (tp + tn) / n if n > 0 else 0
-    error_rate = 1 - accuracy  # Tingkat Kesalahan = 1 - Akurasi
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0  # TPR / Sensitivity
-    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0  # TNR
-    fpr = fp / (tn + fp) if (tn + fp) > 0 else 0  # False Positive Rate
-    fnr = fn / (tp + fn) if (tp + fn) > 0 else 0  # False Negative Rate
-    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    accuracy = (true_positives + true_negatives) / total_samples if total_samples > 0 else 0
+    error_rate = 1 - accuracy
+    precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
+    recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
+    specificity = true_negatives / (true_negatives + false_positives) if (true_negatives + false_positives) > 0 else 0
+    false_positive_rate = false_positives / (true_negatives + false_positives) if (true_negatives + false_positives) > 0 else 0
+    false_negative_rate = false_negatives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
+    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
     
     return {
         "accuracy": accuracy,
@@ -272,18 +274,17 @@ def calculate_metrics(y_true, y_pred):
         "precision": precision,
         "recall": recall,
         "specificity": specificity,
-        "fpr": fpr,
-        "fnr": fnr,
-        "f1_score": f1,
-        "tp": tp,
-        "fp": fp,
-        "tn": tn,
-        "fn": fn
+        "fpr": false_positive_rate,
+        "fnr": false_negative_rate,
+        "f1_score": f1_score,
+        "tp": true_positives,
+        "fp": false_positives,
+        "tn": true_negatives,
+        "fn": false_negatives
     }
 
 
 def print_evaluation_report(name, metrics):
-    # Cetak laporan metrik model biar keliatan rapi
     print("\n" + "=" * 60)
     print(f" LAPORAN EVALUASI: DATA {name.upper()}")
     print("=" * 60)
@@ -331,7 +332,7 @@ def load_model_from_json(filename):
     with open(filename, "r") as f:
         data = json.load(f)
         
-    model = MixedNaiveBayes(cat_cols=data["cat_cols"], num_cols=data["num_cols"])
+    model = NaiveBayes(cat_cols=data["cat_cols"], num_cols=data["num_cols"])
     model.classes = data["classes"]
     
     # Fungsi pembantu untuk mengembalikan kunci string dari JSON ke tipe aslinya (int/float)
@@ -400,7 +401,7 @@ def run_demo_predictions(model):
     ]
 
     for i, sample in enumerate(uji_kasus, 1):
-        pred, log_scores = model.predict_single(sample)
+        pred, log_scores = model.predict_single(sample, threshold_offset=THRESHOLD_OFFSET)
         label_pred = "TINGKAT STRES TINGGI (1)" if pred == 1 else "TINGKAT STRES RENDAH (0)"
         print(f"\n  Kasus Uji {i}:")
         print(f"    Tipe Mahasiswa      : {sample['Student_Type']}")
@@ -412,79 +413,16 @@ def run_demo_predictions(model):
         print(f"    -> Hasil Prediksi   : ** {label_pred} **")
 
 
-# 8. Input Manual Interaktif
-def run_interactive_input(model):
-    """
-    Memungkinkan user mengetik data sendiri lewat konsol untuk diprediksi.
-    """
-    try:
-        if not sys.stdin.isatty():
-            print("\n[INFO] Non-interactive environment. Skip ketik manual.")
-            return
-            
-        print("\n" + "=" * 70)
-        print(" INPUT INTERAKTIF (UJI DATA BARU)")
-        print("=" * 70)
-        tanya_user = input("Mau coba ketik data kamu sendiri? (y/n): ").strip().lower()
-        if tanya_user == 'y':
-            while True:
-                print("\nKetik data kamu di bawah:")
-                try:
-                    tipe = input("- Tipe Mahasiswa (college/school/working_student): ").strip().lower()
-                    if tipe not in ['college', 'school', 'working_student']:
-                        tipe = 'college'
-                        print("  (Input salah, otomatis diganti ke 'college')")
-                        
-                    sleep = float(input("- Jam Tidur per Hari (misal 6.5): "))
-                    study = float(input("- Jam Belajar per Hari (misal 4.0): "))
-                    socmed = float(input("- Jam Medsos per Hari (misal 2.0): "))
-                    attend = float(input("- Kehadiran Kelas (0 - 100): "))
-                    pressure = float(input("- Skala Tekanan Ujian (1 - 10): "))
-                    support = float(input("- Skala Dukung Keluarga (1 - 10): "))
-                    month = float(input("- Bulan Akademik (1 - 12): "))
-                    
-                    user_sample = {
-                        "Student_Type": tipe,
-                        "Sleep_Hours": sleep,
-                        "Study_Hours": study,
-                        "Social_Media_Hours": socmed,
-                        "Attendance": attend,
-                        "Exam_Pressure": pressure,
-                        "Family_Support": support,
-                        "Month": month
-                    }
-                    
-                    pred, _ = model.predict_single(user_sample)
-                    label_pred = "TINGKAT STRES TINGGI (1)" if pred == 1 else "TINGKAT STRES RENDAH (0)"
-                    print(f"\n==========================================")
-                    print(f"HASIL PREDIKSI: {label_pred}")
-                    print(f"==========================================")
-                    
-                except ValueError:
-                    print("  [ERROR] Masukan angka salah. Ulangi lagi.")
-                    
-                lagi = input("\nMau coba data lain? (y/n): ").strip().lower()
-                if lagi != 'y':
-                    break
-    except (EOFError, KeyboardInterrupt):
-        print("\nInput manual dihentikan.")
-
 
 # 9. Mode 1: Training dari Awal
 def mode_train_from_scratch():
     """
-    Alur lengkap: Load data -> Preprocess -> EDA -> Split -> Training -> Evaluasi -> Ekspor JSON.
+    Alur: Load data -> Preprocess -> Split -> Training -> Ekspor JSON.
     """
-    # Load dan preprocess data
     df = load_and_preprocess(FILEPATH)
     
-    # Jalankan visualisasi info data (EDA)
-    run_eda(df)
+    train_df, _, _ = train_val_test_split(df)
     
-    # Bagi data jadi Train, Val, Test
-    train_df, val_df, test_df = train_val_test_split(df)
-    
-    # Pisahin tipe fitur kategorik dan numerik
     cat_features = ["Student_Type"]
     num_features = [
         "Sleep_Hours",
@@ -498,44 +436,19 @@ def mode_train_from_scratch():
     
     X_train = train_df[cat_features + num_features]
     y_train = train_df[TARGET_COL]
-    
-    X_val = val_df[cat_features + num_features]
-    y_val = val_df[TARGET_COL]
-    
-    X_test = test_df[cat_features + num_features]
-    y_test = test_df[TARGET_COL]
 
-    # Training model
     print("\n[STEP 4] Melatih model Naive Bayes...")
-    model = MixedNaiveBayes(cat_cols=cat_features, num_cols=num_features)
+    model = NaiveBayes(cat_cols=cat_features, num_cols=num_features)
     model.fit(X_train, y_train)
     print("  -> Model kelar dilatih di data training!")
 
-    # Ekspor model ke file JSON
     print("\n[STEP 5] Mengekspor model hasil latihan ke JSON...")
     save_model_to_json(model, "model_naive_bayes.json")
 
-    # Cek bobot awal prior kelas
     print("\nPrior Probability hasil training:")
     for cls in model.classes:
         label = "Rendah (0)" if cls == 0 else "Tinggi (1)"
         print(f"  P({label}) = {model.priors[cls]:.4f}")
-
-    # Tes performa ke data Validation
-    print("\n[STEP 6] Evaluasi pada data Validation...")
-    val_preds = model.predict(X_val)
-    val_metrics = calculate_metrics(y_val, val_preds)
-    print_evaluation_report("Validation", val_metrics)
-
-    # Tes performa ke data Testing
-    print("\n[STEP 7] Evaluasi pada data Testing...")
-    test_preds = model.predict(X_test)
-    test_metrics = calculate_metrics(y_test, test_preds)
-    print_evaluation_report("Testing", test_metrics)
-
-    # Demo prediksi & input interaktif
-    run_demo_predictions(model)
-    run_interactive_input(model)
 
 
 # 10. Mode 2: Muat Model dari Berkas JSON
@@ -547,24 +460,23 @@ def mode_load_from_json():
     
     if not os.path.exists(json_file):
         print(f"\n  [ERROR] File model '{json_file}' tidak ditemukan!")
-        print("  Jalankan Mode 1 (Training dari Awal) dulu untuk membuat file model.")
+        print("  Jalankan Mode 1 (Training & Ekspor Model) dulu untuk membuat file model.")
         return
     
     print(f"\n[STEP 1] Memuat model dari berkas '{json_file}'...")
     model = load_model_from_json(json_file)
     
-    # Cek bobot awal prior kelas
     print("\nPrior Probability dari model JSON:")
     for cls in model.classes:
         label = "Rendah (0)" if cls == 0 else "Tinggi (1)"
         print(f"  P({label}) = {model.priors[cls]:.4f}")
     
-    # Load data untuk evaluasi
     print(f"\n[STEP 2] Memuat dataset untuk evaluasi...")
     df = load_and_preprocess(FILEPATH)
     
-    # Bagi data (pakai seed yang sama supaya split konsisten)
-    train_df, val_df, test_df = train_val_test_split(df)
+    run_eda(df)
+    
+    _, val_df, test_df = train_val_test_split(df)
     
     cat_features = ["Student_Type"]
     num_features = [
@@ -583,37 +495,32 @@ def mode_load_from_json():
     X_test = test_df[cat_features + num_features]
     y_test = test_df[TARGET_COL]
     
-    # Evaluasi pada data Validation
     print("\n[STEP 3] Evaluasi model JSON pada data Validation...")
-    val_preds = model.predict(X_val)
+    val_preds = model.predict(X_val, threshold_offset=THRESHOLD_OFFSET)
     val_metrics = calculate_metrics(y_val, val_preds)
     print_evaluation_report("Validation (Model JSON)", val_metrics)
     
-    # Evaluasi pada data Testing
     print("\n[STEP 4] Evaluasi model JSON pada data Testing...")
-    test_preds = model.predict(X_test)
+    test_preds = model.predict(X_test, threshold_offset=THRESHOLD_OFFSET)
     test_metrics = calculate_metrics(y_test, test_preds)
     print_evaluation_report("Testing (Model JSON)", test_metrics)
     
-    # Demo prediksi & input interaktif
     run_demo_predictions(model)
-    run_interactive_input(model)
 
 
 # 11. Main Program (Menu Utama)
 def main():
     print("=" * 70)
     print("      SISTEM PREDIKSI TINGKAT STRES MAHASISWA")
-    print("    Metode: Mixed Gaussian & Categorical Naive Bayes")
+    print("    Metode: Naive Bayes")
     print("=" * 70)
     
     print("\n  Pilih mode yang ingin dijalankan:")
-    print("  [1] Training dari Awal (Load Data -> Training -> Evaluasi -> Ekspor JSON)")
-    print("  [2] Muat Model dari JSON (Langsung pakai model yang sudah dilatih)")
+    print("  [1] Training & Ekspor Model ke JSON")
+    print("  [2] Muat Model JSON & Evaluasi (Gunakan Model)")
     
     try:
         if not sys.stdin.isatty():
-            # Non-interactive: default ke Mode 1
             print("\n  [INFO] Non-interactive environment. Otomatis jalankan Mode 1.")
             pilihan = "1"
         else:
@@ -624,12 +531,25 @@ def main():
     
     if pilihan == "1":
         print("\n" + "-" * 70)
-        print("  >> Mode 1: TRAINING DARI AWAL")
+        print("  >> Mode 1: TRAINING & EKSPOR MODEL")
         print("-" * 70)
         mode_train_from_scratch()
+        
+        try:
+            if sys.stdin.isatty():
+                print("\n" + "-" * 70)
+                tanya_lanjut = input("Mau langsung lanjut ke Mode 2 (Muat Model & Evaluasi)? (y/n): ").strip().lower()
+                if tanya_lanjut == 'y':
+                    print("\n" + "-" * 70)
+                    print("  >> Mode 2: MUAT MODEL & EVALUASI")
+                    print("-" * 70)
+                    mode_load_from_json()
+        except (EOFError, KeyboardInterrupt):
+            print("\nKeluar dari program.")
+            return
     elif pilihan == "2":
         print("\n" + "-" * 70)
-        print("  >> Mode 2: MUAT MODEL DARI JSON")
+        print("  >> Mode 2: MUAT MODEL & EVALUASI")
         print("-" * 70)
         mode_load_from_json()
     else:
