@@ -9,12 +9,8 @@ RANDOM_SEED = 42
 THRESHOLD_OFFSET = -0.5
 
 
-# 1. Load & Preprocess Data
 def load_and_preprocess(filepath):
-    """
-    Fungsi buat membaca dataset dan membersihkan missing values (imputasi).
-    Menampilkan visualisasi tabel missing-values sebelum/sesudah, dan menggambar grafik perbandingan.
-    """
+    """Membaca dataset dan melakukan imputasi missing values."""
     print(f"\n[STEP 1] Memuat dataset dari '{filepath}'...")
     
     if not os.path.exists(filepath):
@@ -40,12 +36,12 @@ def load_and_preprocess(filepath):
 
     print("\n[STEP 2] Preprocessing & Imputasi Missing Values...")
     
-    # 1. Catat status missing values sebelum imputasi untuk divisualisasikan
+    # Catat status missing values
     missing_before = df.isnull().sum().to_dict()
     missing_after = {}
     imputation_methods = {}
     
-    # 2. Proses Imputasi Kolom Kategorikal (Student_Type) menggunakan Modus
+    # Imputasi kolom kategorikal
     if "Student_Type" in df.columns:
         missing_cat = missing_before.get("Student_Type", 0)
         if missing_cat > 0:
@@ -56,7 +52,7 @@ def load_and_preprocess(filepath):
             imputation_methods["Student_Type"] = "-"
         missing_after["Student_Type"] = df["Student_Type"].isnull().sum()
 
-    # 3. Proses Imputasi Kolom Numerik menggunakan Mean (Rata-rata)
+    # Imputasi kolom numerik
     num_cols = df.select_dtypes(include=["number"]).columns.tolist()
     if TARGET_COL in num_cols:
         num_cols.remove(TARGET_COL)
@@ -73,13 +69,12 @@ def load_and_preprocess(filepath):
             imputation_methods[col] = "-"
         missing_after[col] = df[col].isnull().sum()
         
-    # Tambahkan kolom lain yang belum tercatat (jika ada)
     for col in df.columns:
         if col not in missing_after:
             missing_after[col] = df[col].isnull().sum()
             imputation_methods[col] = "-"
 
-    # 4. Tampilkan Tabel Visualisasi Laporan Preprocessing
+    # Tampilkan tabel preprocessing
     print("  +-----------------------------------------------------------------------------------+")
     print("  |                   TABEL VISUALISASI LAPORAN PREPROCESSING DATA                    |")
     print("  +----------------------+--------------------+--------------------+------------------+")
@@ -95,64 +90,11 @@ def load_and_preprocess(filepath):
     print("  +----------------------+--------------------+--------------------+------------------+")
     print("  -> Imputasi data selesai dengan sukses. Data bersih siap digunakan.")
     
-    # 5. Visualisasi Plot Grafis (Opsional jika matplotlib terpasang)
-    try:
-        import matplotlib.pyplot as plt
-        print("\n  [INFO] Menampilkan grafik perbandingan missing values...")
-        columns = list(missing_before.keys())
-        before_vals = [missing_before[col] for col in columns]
-        after_vals = [missing_after[col] for col in columns]
-        
-        fig, ax = plt.subplots(figsize=(10, 6))
-        y = range(len(columns))
-        width = 0.35
-        
-        rects1 = ax.barh([i + width/2 for i in y], before_vals, width, label='Sebelum Imputasi', color='#E74C3C')
-        rects2 = ax.barh([i - width/2 for i in y], after_vals, width, label='Setelah Imputasi (Bersih)', color='#2ECC71')
-        
-        # Tambahkan label angka di samping setiap bar agar nilai terlihat jelas
-        for rect in rects1:
-            val = rect.get_width()
-            if val > 0:  # Hanya tampilkan label jika nilainya bukan 0
-                ax.annotate(f'{int(val)}',
-                            xy=(val, rect.get_y() + rect.get_height() / 2),
-                            xytext=(5, 0),
-                            textcoords="offset points",
-                            ha='left', va='center', fontsize=9, color='black', fontweight='bold')
-                        
-        for rect in rects2:
-            val = rect.get_width()
-            if val > 0:  # Hanya tampilkan label jika nilainya bukan 0
-                ax.annotate(f'{int(val)}',
-                            xy=(val, rect.get_y() + rect.get_height() / 2),
-                            xytext=(5, 0),
-                            textcoords="offset points",
-                            ha='left', va='center', fontsize=9, color='black', fontweight='bold')
-        
-        ax.set_xlabel('Jumlah Nilai Kosong')
-        ax.set_title('Visualisasi Perbandingan Nilai Kosong Sebelum vs Setelah Preprocessing')
-        ax.set_yticks(y)
-        ax.set_yticklabels(columns)
-        ax.invert_yaxis()  # Supaya urutan kolom sama seperti di tabel (dari atas ke bawah)
-        
-        # Set limit X agar label teks di samping bar tidak terpotong
-        max_val = max(before_vals) if before_vals else 0
-        ax.set_xlim(0, max_val * 1.15)
-        
-        ax.legend()
-        plt.tight_layout()
-        plt.show()
-    except ImportError:
-        print("\n  [INFO] Jalankan 'pip install matplotlib' jika ingin melihat grafik visual secara lokal.")
-        
     return df
 
 
-# 2. Exploratory Data Analysis (EDA)
 def run_eda(df):
-    """
-    Analisis data simpel buat ngeliat gambaran dataset.
-    """
+    """Analisis data eksploratif (EDA) sederhana."""
     print("\n" + "=" * 60)
     print(" EXPLORATORY DATA ANALYSIS (EDA)")
     print("=" * 60)
@@ -180,11 +122,8 @@ def run_eda(df):
     print("=" * 60 + "\n")
 
 
-# 3. Split Data
 def train_val_test_split(df, train_ratio=0.70, val_ratio=0.15, test_ratio=0.15, seed=RANDOM_SEED):
-    """
-    Bagi dataset acak jadi training, validation, dan testing set.
-    """
+    """Membagi dataset menjadi train, validation, dan test set."""
     print(f"\n[STEP 3] Membagi data (Train: {train_ratio*100:.0f}%, Val: {val_ratio*100:.0f}%, Test: {test_ratio*100:.0f}%)...")
     
     shuffled_df = df.sample(frac=1, random_state=seed).reset_index(drop=True)
@@ -204,157 +143,98 @@ def train_val_test_split(df, train_ratio=0.70, val_ratio=0.15, test_ratio=0.15, 
     return train_df, val_df, test_df
 
 
-# 4. Naive Bayes Classifier
 class NaiveBayes:
-    """
-    Model Klasifikasi Naive Bayes untuk Data Campuran (Mixed Naive Bayes).
-    
-    Model ini dirancang untuk dapat menangani dua jenis tipe data fitur sekaligus:
-    1. Fitur Kategorikal: Dihitung menggunakan probabilitas tabel frekuensi dengan
-       Laplace Smoothing untuk mencegah masalah zero-probability (peluang nol).
-    2. Fitur Numerik Kontinu: Dihitung menggunakan Probability Density Function (PDF)
-       dari Distribusi Gaussian (Normal). Rata-rata (mean) dan variansi (variance)
-       dihitung untuk setiap kelas.
-    """
+    """Mixed Naive Bayes Classifier untuk fitur numerik dan kategorikal."""
     def __init__(self, cat_cols=None, num_cols=None):
         self.cat_cols = cat_cols if cat_cols is not None else []
         self.num_cols = num_cols if num_cols is not None else []
         self.classes = []
         self.priors = {}
-        
-        # Likelihood kategorik: self.cat_likelihoods[kelas][fitur][nilai] = P(nilai_fitur | kelas)
         self.cat_likelihoods = {}
-        
-        # Parameter numerik: self.num_params[kelas][fitur] = (mean, variance)
         self.num_params = {}
         
-        # Menyimpan daftar nilai unik dari fitur kategorikal yang ditemukan saat training
-        # Penting untuk menentukan ukuran vocabulary (V) dalam Laplace Smoothing
+        # Daftar nilai unik fitur kategorikal untuk Laplace Smoothing
         self.cat_unique_vals = {}
 
     def fit(self, X, y):
-        """
-        Melatih model Naive Bayes dengan menghitung probabilitas Prior dan Parameter Likelihood.
-        
-        Langkah-langkah Training:
-        1. Identifikasi kelas target yang unik (misal: 0 = Stres Rendah, 1 = Stres Tinggi).
-        2. Hitung Prior Probability P(C) untuk tiap kelas.
-        3. Catat nilai unik dari fitur kategorikal untuk Laplace Smoothing.
-        4. Hitung Parameter Likelihood untuk setiap kelas:
-           - Kategorikal: Tabel probabilitas dengan Laplace Smoothing.
-           - Numerik: Mean (rata-rata) dan Variansi (variance) untuk PDF Gaussian.
-        """
-        # --- Langkah 1: Identifikasi Kelas Unik ---
+        """Melatih model Naive Bayes."""
+        # Identifikasi kelas unik
         self.classes = sorted(y.unique().tolist())
         total_samples = len(y)
         
-        # --- Langkah 2: Hitung Prior Probability P(C) ---
-        # Rumus: P(C) = Jumlah sampel kelas C / Total seluruh sampel data
+        # Prior Probability: P(C) = Sampel kelas C / Total sampel
         for class_label in self.classes:
             class_count = sum(y == class_label)
             self.priors[class_label] = class_count / total_samples
             
-        # --- Langkah 3: Catat Nilai Unik Fitur Kategorikal ---
-        # Diperlukan untuk menghitung jumlah kategori unik (V) pada Laplace Smoothing
+        # Simpan nilai unik fitur kategorikal untuk Laplace Smoothing
         for feature_name in self.cat_cols:
             self.cat_unique_vals[feature_name] = sorted(X[feature_name].unique().tolist())
             
-        # --- Langkah 4: Hitung Likelihood dan Parameter Distribusi ---
+        # Hitung likelihood dan parameter
         for class_label in self.classes:
             self.cat_likelihoods[class_label] = {}
             self.num_params[class_label] = {}
             
-            # Filter baris data yang sesuai dengan kelas saat ini
             X_class = X[y == class_label]
             class_sample_count = len(X_class)
             
-            # A. Pemodelan Fitur Kategorikal (Laplace Smoothing)
-            # Rumus: P(x_i | C) = (Jumlah kemunculan x_i di kelas C + 1) / (N_c + V_i)
-            # N_c = jumlah sampel kelas C, V_i = jumlah kategori unik pada fitur i
+            # Likelihood Kategorikal dengan Laplace Smoothing
             for feature_name in self.cat_cols:
                 self.cat_likelihoods[class_label][feature_name] = {}
                 counts = X_class[feature_name].value_counts()
                 unique_vals = self.cat_unique_vals[feature_name]
-                category_count = len(unique_vals)  # Nilai V_i (Laplace parameter)
+                category_count = len(unique_vals)
                 
                 for feature_value in unique_vals:
                     val_count = counts.get(feature_value, 0)
-                    # Rumus Laplace Smoothing untuk menghindari peluang nol jika kategori tak muncul
                     probability = (val_count + 1) / (class_sample_count + category_count)
                     self.cat_likelihoods[class_label][feature_name][feature_value] = probability
             
-            # B. Pemodelan Fitur Numerik Kontinu (Gaussian Parameter)
-            # Mengasumsikan data terdistribusi normal. Kita hitung Mean (mu) dan Variansi (sigma^2).
+            # Likelihood Numerik dengan Parameter Gaussian
             for feature_name in self.num_cols:
                 mean_val = X_class[feature_name].mean()
                 variance = X_class[feature_name].var()
                 
-                # Penanganan khusus jika variansi bernilai 0 atau NaN (untuk mencegah pembagian nol di PDF)
                 if variance == 0 or pd.isna(variance):
                     variance = 1e-9
                 self.num_params[class_label][feature_name] = (mean_val, variance)
 
     def _gaussian_pdf(self, x, mean_val, variance):
-        """
-        Menghitung Probability Density Function (PDF) dari Distribusi Gaussian (Normal).
-        Digunakan untuk memperkirakan probabilitas kontinu: P(x | kelas)
-        
-        Rumus Gaussian PDF:
-        f(x; mu, sigma^2) = [ 1 / sqrt(2 * pi * variance) ] * e^( - (x - mu)^2 / (2 * variance) )
-        
-        Dimana:
-        - mu (mean_val)     : rata-rata nilai fitur pada kelas tersebut.
-        - sigma^2 (variance): variansi nilai fitur pada kelas tersebut.
-        """
-        # 1. Hitung bagian pembagi (koefisien normalisasi): 1 / sqrt(2 * pi * variance)
+        """Menghitung Gaussian Probability Density Function (PDF)."""
         coefficient = 1.0 / math.sqrt(2 * math.pi * variance)
-        
-        # 2. Hitung nilai eksponen: -((x - mean)^2) / (2 * variance)
         exponent = math.exp(-((x - mean_val) ** 2) / (2 * variance))
-        
-        # 3. Kembalikan hasil perkalian keduanya
         return coefficient * exponent
 
     def predict_single(self, sample, threshold_offset=0.0):
-        """
-        Memprediksi kelas untuk satu baris sampel data.
-        
-        Penting untuk Menghindari Underflow:
-        Karena nilai peluang berkisar antara 0 dan 1, mengalikan banyak peluang akan menghasilkan
-        nilai yang sangat kecil mendekati nol (numerical underflow).
-        Oleh karena itu, kita ubah perkalian menjadi penjumlahan dengan logaritma natural:
-        P(C | X) = P(C) * P(x_1|C) * P(x_2|C) ...
-        Menjadi:
-        log P(C | X) = log P(C) + log P(x_1|C) + log P(x_2|C) ...
-        """
+        """Memprediksi kelas untuk satu baris sampel data."""
         log_scores = {}
         
         for class_label in self.classes:
-            # 1. Mulai dari nilai log dari Prior Probability: log P(C)
+            # Mulai dari log Prior Probability
             log_prob = math.log(self.priors[class_label])
             
-            # 2. Tambahkan log likelihood fitur kategorikal
+            # Tambahkan log likelihood kategorikal
             for feature_name in self.cat_cols:
                 feature_value = sample[feature_name]
                 
-                # Cek jika nilai kategori ada di kamus pelatihan
                 if feature_value in self.cat_likelihoods[class_label][feature_name]:
                     probability = self.cat_likelihoods[class_label][feature_name][feature_value]
                 else:
-                    # Fallback jika ada kategori baru di data uji: gunakan Laplace smoothing dasar
+                    # Fallback kategori baru dengan Laplace smoothing
                     category_count = len(self.cat_unique_vals[feature_name])
                     probability = 1.0 / (category_count + 1)
                     
                 log_prob += math.log(probability)
                 
-            # 3. Tambahkan log likelihood fitur numerik menggunakan Gaussian PDF
+            # Tambahkan log likelihood numerik via Gaussian PDF
             for feature_name in self.num_cols:
                 feature_value = float(sample[feature_name])
                 mean_val, variance = self.num_params[class_label][feature_name]
                 
                 probability = self._gaussian_pdf(feature_value, mean_val, variance)
                 
-                # Batasi nilai probabilitas agar tidak 0 (untuk mencegah error log(0))
+                # Batasi probabilitas agar tidak 0 (hindari error log(0))
                 if probability < 1e-15:
                     probability = 1e-15
                     
@@ -362,13 +242,7 @@ class NaiveBayes:
                 
             log_scores[class_label] = log_prob
             
-        # 4. Penentuan Keputusan Akhir (Argmax dengan Modifikasi Threshold)
-        # Jika klasifikasi biner 0 (Rendah) dan 1 (Tinggi), kita gunakan threshold_offset.
-        # Secara matematis:
-        # Prediksi 1 jika: log P(C=1|X) - log P(C=0|X) > threshold_offset
-        # Yang ekuivalen dengan: log P(C=1|X) > log P(C=0|X) + threshold_offset
-        # Jika threshold_offset bernilai negatif (misal -0.5), model akan lebih cenderung memilih kelas 1.
-        # Hal ini sangat berguna jika kita ingin meminimalkan False Negative (stres tinggi terlewat diprediksi rendah).
+        # Penentuan keputusan akhir (argmax) dengan modifikasi threshold_offset
         if len(self.classes) == 2 and self.classes == [0, 1]:
             log_difference = log_scores[1] - log_scores[0]
             if log_difference > threshold_offset:
@@ -376,21 +250,12 @@ class NaiveBayes:
             else:
                 return 0, log_scores
         else:
-            # Standar multi-kelas: pilih kelas dengan log probability tertinggi (argmax)
+            # Standar multi-kelas argmax
             best_class = max(log_scores, key=log_scores.get)
             return best_class, log_scores
 
     def predict(self, X, threshold_offset=0.0):
-        """
-        Memprediksi sekumpulan data (pandas DataFrame) baris demi baris.
-        
-        Parameter:
-        X                : pandas.DataFrame -> Fitur data uji
-        threshold_offset : float            -> Nilai pergeseran batas keputusan biner
-        
-        Mengembalikan:
-        list -> Berisi hasil prediksi kelas (0 atau 1) untuk setiap baris
-        """
+        """Memprediksi sekumpulan data (pandas DataFrame) baris demi baris."""
         predictions = []
         for _, row in X.iterrows():
             pred, _ = self.predict_single(row, threshold_offset)
@@ -398,34 +263,17 @@ class NaiveBayes:
         return predictions
 
 
-# 5. Evaluasi Metriks
 def calculate_metrics(y_true, y_pred):
-    """
-    Menghitung metrik performa klasifikasi secara manual dari awal tanpa library eksternal.
-    
-    Langkah:
-    1. Hitung Confusion Matrix: True Positive (TP), False Positive (FP), 
-       True Negative (TN), dan False Negative (FN).
-    2. Hitung metrik turunan: Akurasi, Error Rate, Presisi, Recall, Specificity,
-       False Positive Rate (FPR), False Negative Rate (FNR), dan F1-Score.
-       
-    Definisi Istilah:
-    - TP (True Positive)  : Kelas Aktual 1 (Tinggi), diprediksi 1 (Tinggi)
-    - FP (False Positive) : Kelas Aktual 0 (Rendah), diprediksi 1 (Tinggi)
-    - TN (True Negative)  : Kelas Aktual 0 (Rendah), diprediksi 0 (Rendah)
-    - FN (False Negative) : Kelas Aktual 1 (Tinggi), diprediksi 0 (Rendah)
-    """
+    """Menghitung metrik evaluasi klasifikasi secara manual."""
     actual_labels = list(y_true)
     predicted_labels = list(y_pred)
     total_samples = len(actual_labels)
     
-    # Inisialisasi elemen Confusion Matrix
     true_positives = 0
     false_positives = 0
     true_negatives = 0
     false_negatives = 0
     
-    # 1. Akumulasi Confusion Matrix
     for actual_val, predicted_val in zip(actual_labels, predicted_labels):
         if actual_val == 1 and predicted_val == 1:
             true_positives += 1
@@ -436,29 +284,13 @@ def calculate_metrics(y_true, y_pred):
         elif actual_val == 1 and predicted_val == 0:
             false_negatives += 1
             
-    # 2. Perhitungan Metrik Turunan (disertai penanganan pembagian nol dengan fallback 0)
-    # Akurasi: Proporsi prediksi benar dari seluruh data
     accuracy = (true_positives + true_negatives) / total_samples if total_samples > 0 else 0
-    
-    # Error Rate: Proporsi prediksi yang salah
     error_rate = 1 - accuracy
-    
-    # Presisi: Dari semua yang diprediksi positif, berapa yang sebenarnya positif
     precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
-    
-    # Recall (Sensitivity/TPR): Dari semua yang sebenarnya positif, berapa yang berhasil dideteksi
     recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
-    
-    # Specificity (TNR): Dari semua yang sebenarnya negatif, berapa yang berhasil dideteksi
     specificity = true_negatives / (true_negatives + false_positives) if (true_negatives + false_positives) > 0 else 0
-    
-    # FPR: Rasio kelas negatif yang salah dideteksi sebagai positif
     false_positive_rate = false_positives / (true_negatives + false_positives) if (true_negatives + false_positives) > 0 else 0
-    
-    # FNR: Rasio kelas positif yang salah dideteksi sebagai negatif
     false_negative_rate = false_negatives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
-    
-    # F1-Score: Rata-rata harmonik antara Presisi dan Recall (keseimbangan keduanya)
     f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
     
     return {
@@ -478,10 +310,7 @@ def calculate_metrics(y_true, y_pred):
 
 
 def print_evaluation_report(name, metrics):
-    """
-    Menampilkan laporan evaluasi model secara detail ke konsol,
-    termasuk semua metrik performa utama dan tabel Confusion Matrix.
-    """
+    """Menampilkan laporan evaluasi model ke konsol."""
     print("\n" + "=" * 65)
     print(f" LAPORAN EVALUASI: DATA {name.upper()}")
     print("=" * 65)
@@ -511,11 +340,8 @@ def print_evaluation_report(name, metrics):
     print("=" * 65)
 
 
-# 6. Ekspor & Impor Model ke berkas JSON
 def save_model_to_json(model, filename):
-    """
-    Menyimpan parameter model hasil training ke berkas JSON.
-    """
+    """Menyimpan parameter model ke berkas JSON."""
     import json
     model_data = {
         "cat_cols": model.cat_cols,
@@ -532,9 +358,7 @@ def save_model_to_json(model, filename):
 
 
 def load_model_from_json(filename):
-    """
-    Memuat kembali model Naive Bayes yang sudah dilatih dari berkas JSON.
-    """
+    """Memuat model Naive Bayes dari berkas JSON."""
     import json
     with open(filename, "r") as f:
         data = json.load(f)
@@ -542,7 +366,7 @@ def load_model_from_json(filename):
     model = NaiveBayes(cat_cols=data["cat_cols"], num_cols=data["num_cols"])
     model.classes = data["classes"]
     
-    # Fungsi pembantu untuk mengembalikan kunci string dari JSON ke tipe aslinya (int/float)
+    # Konversi string key ke tipe aslinya
     def convert_key(k):
         try:
             if float(k).is_integer():
@@ -551,16 +375,13 @@ def load_model_from_json(filename):
         except ValueError:
             return k
             
-    # Kembalikan tipe data kunci P(C)
     model.priors = {convert_key(k): v for k, v in data["priors"].items()}
     
-    # Kembalikan tipe data kunci Likelihood kategorikal
     model.cat_likelihoods = {}
     for cls_str, cols_data in data["cat_likelihoods"].items():
         cls = convert_key(cls_str)
         model.cat_likelihoods[cls] = cols_data
         
-    # Kembalikan tipe data kunci Parameter numerik (mean, variance)
     model.num_params = {}
     for cls_str, cols_data in data["num_params"].items():
         cls = convert_key(cls_str)
@@ -573,18 +394,15 @@ def load_model_from_json(filename):
     return model
 
 
-# 7. Demo Prediksi Kasus Khusus
 def run_demo_predictions(model):
-    """
-    Menjalankan demo prediksi dengan data sampel yang sudah disiapkan.
-    """
+    """Menjalankan demo prediksi sampel kasus."""
     print("\n" + "=" * 70)
     print(" DEMO PREDIKSI KASUS KHUSUS (UJI)")
     print("=" * 70)
     
     uji_kasus = [
         {
-            # Kasus A: Kuliah berat, kurang tidur, jarang disupport
+            # Kasus 1
             "Student_Type": "college",
             "Sleep_Hours": 4.5,
             "Study_Hours": 8.0,
@@ -595,7 +413,7 @@ def run_demo_predictions(model):
             "Month": 5.0
         },
         {
-            # Kasus B: Sekolah nyantai, tidur cukup, support keluarga oke
+            # Kasus 2
             "Student_Type": "school",
             "Sleep_Hours": 8.5,
             "Study_Hours": 3.0,
@@ -620,14 +438,9 @@ def run_demo_predictions(model):
         print(f"    -> Hasil Prediksi   : ** {label_pred} **")
 
 
-
-# 9. Mode 1: Training dari Awal
 def mode_train_from_scratch():
-    """
-    Alur: Load data -> Preprocess -> Split -> Training -> Ekspor JSON.
-    """
+    """Mode training model dari awal."""
     df = load_and_preprocess(FILEPATH)
-    
     train_df, _, _ = train_val_test_split(df)
     
     cat_features = ["Student_Type"]
@@ -658,11 +471,8 @@ def mode_train_from_scratch():
         print(f"  P({label}) = {model.priors[cls]:.4f}")
 
 
-# 10. Mode 2: Muat Model dari Berkas JSON
 def mode_load_from_json():
-    """
-    Alur cepat: Langsung muat model yang sudah dilatih dari file JSON, lalu evaluasi & prediksi.
-    """
+    """Mode evaluasi model dari berkas JSON."""
     json_file = "model_naive_bayes.json"
     
     if not os.path.exists(json_file):
@@ -682,7 +492,6 @@ def mode_load_from_json():
     df = load_and_preprocess(FILEPATH)
     
     run_eda(df)
-    
     _, val_df, test_df = train_val_test_split(df)
     
     cat_features = ["Student_Type"]
@@ -715,7 +524,6 @@ def mode_load_from_json():
     run_demo_predictions(model)
 
 
-# 11. Main Program (Menu Utama)
 def main():
     print("=" * 70)
     print("      SISTEM PREDIKSI TINGKAT STRES MAHASISWA")
@@ -747,10 +555,10 @@ def main():
                 print("\n" + "-" * 70)
                 tanya_lanjut = input("Mau langsung lanjut ke Mode 2 (Muat Model & Evaluasi)? (y/n): ").strip().lower()
                 if tanya_lanjut == 'y':
-                    print("\n" + "-" * 70)
-                    print("  >> Mode 2: MUAT MODEL & EVALUASI")
-                    print("-" * 70)
-                    mode_load_from_json()
+                     print("\n" + "-" * 70)
+                     print("  >> Mode 2: MUAT MODEL & EVALUASI")
+                     print("-" * 70)
+                     mode_load_from_json()
         except (EOFError, KeyboardInterrupt):
             print("\nKeluar dari program.")
             return
