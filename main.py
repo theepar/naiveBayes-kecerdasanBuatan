@@ -120,7 +120,7 @@ class NaiveBayes:
                 self.num_params[class_label][feature_name] = (mean_val, variance if variance > 0 else 1e-9)
 
     def predict(self, X, threshold_offset=0.0):
-        # Melakukan prediksi kelas untuk sekumpulan data secara cepat (vektorisasi numpy).
+        # Melakukan prediksi untuk kumpulan data (vektorisasi numpy).
         N = len(X)
         log_scores_matrix = np.zeros((N, len(self.classes)))
         
@@ -153,11 +153,11 @@ class NaiveBayes:
         return np.argmax(log_scores_matrix, axis=1).tolist()
 
     def predict_single(self, sample, threshold_offset=0.0):
-        # Melakukan prediksi kelas untuk satu baris data uji.
+        # Melakukan prediksi untuk satu baris data.
         df_temp = pd.DataFrame([sample])
         preds = self.predict(df_temp, threshold_offset)
         
-        # Hitung log-scores untuk return value (kompatibilitas backward)
+        # Hitung log-scores untuk return value 
         log_scores = {}
         for class_label in self.classes:
             lp = math.log(self.priors[class_label])
@@ -199,7 +199,6 @@ def calculate_metrics(y_true, y_pred):
 
 
 def print_evaluation_report(name, metrics):
-    # Mencetak laporan evaluasi dan Confusion Matrix ke terminal.
     print("\n" + "=" * 65)
     print(f" LAPORAN EVALUASI: DATA {name.upper()}")
     print("=" * 65)
@@ -215,7 +214,6 @@ def print_evaluation_report(name, metrics):
 
 
 def run_demo_predictions(model):
-    # Menjalankan demo prediksi untuk dua sampel kasus uji khusus.
     print("\n" + "=" * 70 + "\n DEMO PREDIKSI KASUS\n" + "=" * 70)
     uji_kasus = [
         {"Student_Type": "college", "Sleep_Hours": 4.5, "Study_Hours": 8.0, "Social_Media_Hours": 1.5, "Attendance": 65.0, "Exam_Pressure": 9.0, "Family_Support": 2.0, "Month": 5.0},
@@ -228,16 +226,10 @@ def run_demo_predictions(model):
 
 
 def main():
-    # 1. Load & Preprocess
     df = load_and_preprocess(FILEPATH)
-    
-    # 2. EDA
     run_eda(df)
-    
-    # 3. Split
     train_df, val_df, test_df = train_val_test_split(df)
     
-    # 4. Train Model
     cat_features = ["Student_Type"]
     num_features = ["Sleep_Hours", "Study_Hours", "Social_Media_Hours", "Attendance", "Exam_Pressure", "Family_Support", "Month"]
     
@@ -249,17 +241,14 @@ def main():
     model.fit(X_train, y_train)
     print("  -> Model kelar dilatih!")
     
-    # 5. Evaluasi Validation
     print("\n[STEP 5] Evaluasi pada Data Validation...")
     val_preds = model.predict(val_df[cat_features + num_features], threshold_offset=THRESHOLD_OFFSET)
     print_evaluation_report("Validation", calculate_metrics(val_df[TARGET_COL], val_preds))
     
-    # 6. Evaluasi Testing
     print("\n[STEP 6] Evaluasi pada Data Testing...")
     test_preds = model.predict(test_df[cat_features + num_features], threshold_offset=THRESHOLD_OFFSET)
     print_evaluation_report("Testing", calculate_metrics(test_df[TARGET_COL], test_preds))
     
-    # 7. Demo Prediksi
     run_demo_predictions(model)
 
 
